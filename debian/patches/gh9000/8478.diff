@@ -1,0 +1,16 @@
+Forwarded: part of PR#9000 by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/8478
+Author: iveshenry18 <iveshenry18@gmail.com>
+Description: Make dynList const to avoid compiler warnings
+
+--- a/libmscore/dynamic.cpp
++++ b/libmscore/dynamic.cpp
+@@ -41,7 +41,7 @@ struct Dyn {
+ 
+ // variant with ligatures, works for both emmentaler and bravura:
+ 
+-static Dyn dynList[] = {
++static const Dyn dynList[] = {
+       // dynamic:
+       {  -1,  true,  "other-dynamics", "", 0 },
+       {   1,  false, "pppppp", "<sym>dynamicPiano</sym><sym>dynamicPiano</sym><sym>dynamicPiano</sym><sym>dynamicPiano</sym><sym>dynamicPiano</sym><sym>dynamicPiano</sym>", 0 },

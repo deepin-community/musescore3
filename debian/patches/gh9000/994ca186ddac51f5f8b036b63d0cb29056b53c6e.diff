@@ -1,0 +1,37 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Igor Korsukov <igor.korsukov@gmail.com>
+Description: Fix GH#9447: Crash on removing accidental from ambitus
+ Fixed by just ignoring the operation, i.e. not removing the accidental.
+ Instead do this via the Inspector.
+
+--- a/libmscore/ambitus.cpp
++++ b/libmscore/ambitus.cpp
+@@ -629,6 +629,16 @@ void Ambitus::updateRange()
+             }
+       }
+ 
++void Ambitus::remove(Element* e)
++      {
++      if (e->type() == ElementType::ACCIDENTAL) {
++            //! NOTE Do nothing (removing _topAccid or _bottomAccid)
++            return;
++            }
++
++      Element::remove(e);
++      }
++
+ //---------------------------------------------------------
+ //   getProperty
+ //---------------------------------------------------------
+--- a/libmscore/ambitus.h
++++ b/libmscore/ambitus.h
+@@ -89,6 +89,8 @@ class Ambitus final : public Element {
+       virtual bool      readProperties(XmlReader&) override;
+       virtual QString   accessibleInfo() const override;
+ 
++      void remove(Element*) override;
++
+       // properties
+       QVariant getProperty(Pid ) const;
+       bool setProperty(Pid propertyId, const QVariant&);

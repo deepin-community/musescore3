@@ -1,0 +1,42 @@
+Origin: upstream, commit:0998fffc6613149fbaea55ccc9a1bb59d071e0c3
+Author: DangWang <megistios@gmail.com>
+Description: fix #292652: Empty lines become smaller
+
+--- a/libmscore/textbase.cpp
++++ b/libmscore/textbase.cpp
+@@ -889,6 +889,16 @@ void TextBlock::insert(TextCursor* curso
+       }
+ 
+ //---------------------------------------------------------
++//   insertEmptyFragment
++//---------------------------------------------------------
++
++void TextBlock::insertEmptyFragment(TextCursor* cursor)
++      {
++      if (_fragments.size() == 0 || _fragments.at(0).text != "")
++            _fragments.insert(0, TextFragment(cursor, ""));
++      }
++
++//---------------------------------------------------------
+ //   fragment
+ //    inputs:
+ //      column is the column relative to the start of the TextBlock.
+@@ -1319,6 +1329,8 @@ void TextBase::createLayout()
+                   else if (c == '\n') {
+                         if (rows() <= cursor.row())
+                               _layout.append(TextBlock());
++                        if(_layout[cursor.row()].fragments().size() == 0)
++                              _layout[cursor.row()].insertEmptyFragment(&cursor); // used to preserve the Font size of the line (font info is held in TextFragments, see PR #5881)
+                         _layout[cursor.row()].setEol(true);
+                         cursor.setRow(cursor.row() + 1);
+                         cursor.setColumn(0);
+--- a/libmscore/textbase.h
++++ b/libmscore/textbase.h
+@@ -193,6 +193,7 @@ class TextBlock {
+       QRectF boundingRect(int col1, int col2, const TextBase*) const;
+       int columns() const;
+       void insert(TextCursor*, const QString&);
++      void insertEmptyFragment(TextCursor*);
+       QString remove(int column);
+       QString remove(int start, int n);
+       int column(qreal x, TextBase*) const;

@@ -1,0 +1,15 @@
+Origin: upstream, commit:a5a979a758bae239cfae82421e71cf8087ac708b
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #295224: end-start-repeat crashes in timeline
+
+--- a/mscore/timeline.cpp
++++ b/mscore/timeline.cpp
+@@ -1232,7 +1232,7 @@ void Timeline::barline_meta(Segment* seg
+                         repeat_text = QString("End repeat");
+                         break;
+                   case BarLineType::END_START_REPEAT:
+-                        repeat_text = QString("End-start repeat");
++                        // actually an end repeat followed by a start repeat, so nothing needs to be done here
+                         break;
+                   case BarLineType::DOUBLE:
+                         repeat_text = QString("Double barline");

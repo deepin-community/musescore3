@@ -1,0 +1,157 @@
+Origin: upstream, commit:723f6b81322ebd8f9d1a586d94082fcb35f7fca9
+Author: DangWang <megistios@gmail.com>
+Description: fix #303087:
+ Fixed a bug where the cursor would be on the wrong height
+ after deleting all chars in a line
+
+--- a/libmscore/textbase.cpp
++++ b/libmscore/textbase.cpp
+@@ -866,6 +866,7 @@ int TextBlock::column(qreal x, TextBase*
+ void TextBlock::insert(TextCursor* cursor, const QString& s)
+       {
+       int rcol, ridx;
++      removeEmptyFragment(); // since we are going to write text, we don't need an empty fragment to hold format info. if such exists, delete it
+       auto i = fragment(cursor->column(), &rcol, &ridx);
+       if (i != _fragments.end()) {
+             if (!(i->format == *cursor->format())) {
+@@ -889,16 +890,30 @@ void TextBlock::insert(TextCursor* curso
+       }
+ 
+ //---------------------------------------------------------
+-//   insertEmptyFragment
++//
++//   insertEmptyFragmentIfNeeded
++//   used to insert an empty TextFragment in TextBlocks that have none
++//   that way, the formatting information (most importantly the font size) of the line is preserved
++//
+ //---------------------------------------------------------
+ 
+-void TextBlock::insertEmptyFragment(TextCursor* cursor)
++void TextBlock::insertEmptyFragmentIfNeeded(TextCursor* cursor)
+       {
+       if (_fragments.size() == 0 || _fragments.at(0).text != "")
+             _fragments.insert(0, TextFragment(cursor, ""));
+       }
+ 
+ //---------------------------------------------------------
++//   removeEmptyFragment
++//---------------------------------------------------------
++
++void TextBlock::removeEmptyFragment()
++      {
++      if (_fragments.size() > 0 && _fragments.at(0).text == "")
++            _fragments.removeAt(0);
++      }
++
++//---------------------------------------------------------
+ //   fragment
+ //    inputs:
+ //      column is the column relative to the start of the TextBlock.
+@@ -931,7 +946,7 @@ QList<TextFragment>::iterator TextBlock:
+ //   remove
+ //---------------------------------------------------------
+ 
+-QString TextBlock::remove(int column)
++QString TextBlock::remove(int column, TextCursor* cursor)
+       {
+       int col = 0;
+       QString s;
+@@ -951,6 +966,7 @@ QString TextBlock::remove(int column)
+                         if (i->text.isEmpty())
+                               _fragments.erase(i);
+                         simplify();
++                        insertEmptyFragmentIfNeeded(cursor); // without this, cursorRect can't calculate the y position of the cursor correctly
+                         return s;
+                         }
+                   ++idx;
+@@ -960,6 +976,7 @@ QString TextBlock::remove(int column)
+                   ++rcol;
+                   }
+             }
++      insertEmptyFragmentIfNeeded(cursor); // without this, cursorRect can't calculate the y position of the cursor correctly
+       return s;
+ //      qDebug("TextBlock::remove: column %d not found", column);
+       }
+@@ -990,7 +1007,7 @@ void TextBlock::simplify()
+ //   remove
+ //---------------------------------------------------------
+ 
+-QString TextBlock::remove(int start, int n)
++QString TextBlock::remove(int start, int n, TextCursor* cursor)
+       {
+       if (n == 0)
+             return QString();
+@@ -1014,8 +1031,10 @@ QString TextBlock::remove(int start, int
+                               inc = false;
+                               }
+                         --n;
+-                        if (n == 0)
++                        if (n == 0) {
++                              insertEmptyFragmentIfNeeded(cursor); // without this, cursorRect can't calculate the y position of the cursor correctly
+                               return s;
++                              }
+                         continue;
+                         }
+                   ++idx;
+@@ -1027,6 +1046,7 @@ QString TextBlock::remove(int start, int
+             if (inc)
+                   ++i;
+             }
++      insertEmptyFragmentIfNeeded(cursor); // without this, cursorRect can't calculate the y position of the cursor correctly
+       return s;
+       }
+ 
+@@ -1330,7 +1350,7 @@ void TextBase::createLayout()
+                         if (rows() <= cursor.row())
+                               _layout.append(TextBlock());
+                         if(_layout[cursor.row()].fragments().size() == 0)
+-                              _layout[cursor.row()].insertEmptyFragment(&cursor); // used to preserve the Font size of the line (font info is held in TextFragments, see PR #5881)
++                              _layout[cursor.row()].insertEmptyFragmentIfNeeded(&cursor); // used to preserve the Font size of the line (font info is held in TextFragments, see PR #5881)
+                         _layout[cursor.row()].setEol(true);
+                         cursor.setRow(cursor.row() + 1);
+                         cursor.setColumn(0);
+--- a/libmscore/textbase.h
++++ b/libmscore/textbase.h
+@@ -193,9 +193,10 @@ class TextBlock {
+       QRectF boundingRect(int col1, int col2, const TextBase*) const;
+       int columns() const;
+       void insert(TextCursor*, const QString&);
+-      void insertEmptyFragment(TextCursor*);
+-      QString remove(int column);
+-      QString remove(int start, int n);
++      void insertEmptyFragmentIfNeeded(TextCursor*);
++      void removeEmptyFragment();
++      QString remove(int column, TextCursor*);
++      QString remove(int start, int n, TextCursor*);
+       int column(qreal x, TextBase*) const;
+       TextBlock split(int column);
+       qreal xpos(int col, const TextBase*) const;
+--- a/libmscore/textedit.cpp
++++ b/libmscore/textedit.cpp
+@@ -427,7 +427,7 @@ void ChangeText::removeText(EditData* ed
+       int column    = c.column();
+ 
+       for (int n = 0; n < s.size(); ++n)
+-            l.remove(column);
++            l.remove(column, &c);
+       c.text()->triggerLayout();
+       if (ed)
+             *c.text()->cursor(*ed) = tc;
+@@ -629,7 +629,7 @@ void TextBase::inputTransition(EditData&
+       while (n--) {
+             if (_cursor->movePosition(QTextCursor::Left)) {
+                   TextBlock& l  = _cursor->curLine();
+-                   l.remove(_cursor->column());
++                   l.remove(_cursor->column(), _cursor);
+                   _cursor->text()->triggerLayout();
+                   _cursor->text()->setTextInvalid();
+                   }
+@@ -693,7 +693,7 @@ void TextBase::endHexState(EditData& ed)
+                   int c1 = c2 - (hexState + 1);
+ 
+                   TextBlock& t = _layout[_cursor->row()];
+-                  QString ss   = t.remove(c1, hexState + 1);
++                  QString ss   = t.remove(c1, hexState + 1, _cursor);
+                   bool ok;
+                   int code     = ss.mid(1).toInt(&ok, 16);
+                   _cursor->setColumn(c1);

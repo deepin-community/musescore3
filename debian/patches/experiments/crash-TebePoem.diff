@@ -1,0 +1,131 @@
+Description: Fix crash in some files
+ where getPropertyStyle(spp.pid) returns Sid::NOSTYLE
+ .
+ replace styleValue(x, getPropertyStyle(x)) with safePropertyStyleValue(x)
+ .
+ Also note what must be initialised before calling initElementStyle
+ and actually do that for these cases I could identify in 3.2.3
+Author: mirabilos <m@mirbsd.org>
+Bug: https://musescore.org/en/node/331690
+Forwarded: yes
+
+--- a/libmscore/beam.cpp
++++ b/libmscore/beam.cpp
+@@ -58,6 +58,7 @@ struct BeamFragment {
+ Beam::Beam(Score* s)
+    : Element(s)
+       {
++      _direction       = Direction::AUTO;
+       initElementStyle(&beamStyle);
+       _direction       = Direction::AUTO;
+       _up              = true;
+--- a/libmscore/lyrics.cpp
++++ b/libmscore/lyrics.cpp
+@@ -41,6 +41,7 @@ Lyrics::Lyrics(Score* s)
+    : TextBase(s, Tid::LYRICS_ODD)
+       {
+       _even       = false;
++      _no         = 0;
+       initElementStyle(&lyricsElementStyle);
+       _no         = 0;
+       _ticks      = Fraction(0,1);
+--- a/libmscore/ottava.cpp
++++ b/libmscore/ottava.cpp
+@@ -211,6 +211,7 @@ Ottava::Ottava(Score* s)
+       setLineVisible(true);
+       setBeginHookHeight(Spatium(.0));
+       setEndText("");
++      setNumbersOnly(false);
+ 
+       initElementStyle(&ottavaStyle);
+       }
+@@ -405,7 +406,7 @@ QVariant Ottava::propertyDefault(Pid pid
+             case Pid::END_TEXT:
+                   return QString("");
+             case Pid::PLACEMENT:
+-                  return styleValue(Pid::PLACEMENT, getPropertyStyle(Pid::PLACEMENT));
++                  return safePropertyStyleValue(Pid::PLACEMENT);
+ 
+             default:
+                   return TextLineBase::propertyDefault(pid);
+--- a/libmscore/scoreElement.cpp
++++ b/libmscore/scoreElement.cpp
+@@ -196,6 +196,12 @@ QVariant ScoreElement::propertyDefault(P
+ 
+ //---------------------------------------------------------
+ //   initElementStyle
++//
++//  Note: anything ::getPropertyStyle(pid),
++//  ::styleValue(pid, sid) or ::propertyDefault(pid) use
++//  (and ::setProperty(pid, qv) in theory) use MUST be
++//  initialised (in the constructor) BEFORE this call
++//
+ //---------------------------------------------------------
+ 
+ void ScoreElement::initElementStyle(const ElementStyle* ss)
+@@ -207,8 +213,7 @@ void ScoreElement::initElementStyle(cons
+       for (size_t i = 0; i < n; ++i)
+             _propertyFlagsList[i] = PropertyFlags::STYLED;
+       for (const StyledProperty& spp : *_elementStyle)
+-//            setProperty(spp.pid, styleValue(spp.pid, spp.sid));
+-            setProperty(spp.pid, styleValue(spp.pid, getPropertyStyle(spp.pid)));
++            setProperty(spp.pid, safePropertyStyleValue(spp.pid));
+       }
+ 
+ //---------------------------------------------------------
+@@ -737,7 +742,7 @@ void ScoreElement::styleChanged()
+       for (const StyledProperty& spp : *_elementStyle) {
+             PropertyFlags f = propertyFlags(spp.pid);
+             if (f == PropertyFlags::STYLED)
+-                  setProperty(spp.pid, styleValue(spp.pid, getPropertyStyle(spp.pid)));
++                  setProperty(spp.pid, safePropertyStyleValue(spp.pid));
+             }
+       }
+ 
+@@ -856,5 +861,17 @@ QVariant ScoreElement::styleValue(Pid pi
+                   return score()->styleV(sid);
+             }
+       }
+-}
+ 
++//---------------------------------------------------------
++//   styleValueSafe
++//---------------------------------------------------------
++
++QVariant ScoreElement::safePropertyStyleValue(Pid pid) const
++      {
++      Sid sid = getPropertyStyle(pid);
++      if (sid != Sid::NOSTYLE)
++            return styleValue(pid, sid);
++      return propertyDefault(pid);
++      }
++
++}
+--- a/libmscore/scoreElement.h
++++ b/libmscore/scoreElement.h
+@@ -215,6 +215,7 @@ class ScoreElement {
+       virtual PropertyFlags propertyFlags(Pid) const;
+       bool isStyled(Pid pid) const;
+       QVariant styleValue(Pid, Sid) const;
++      QVariant safePropertyStyleValue(Pid) const;
+ 
+       virtual void setPropertyFlags(Pid, PropertyFlags);
+ 
+--- a/libmscore/textbase.cpp
++++ b/libmscore/textbase.cpp
+@@ -2656,13 +2656,13 @@ void TextBase::styleChanged()
+       for (const StyledProperty& spp : *_elementStyle) {
+             PropertyFlags f = _propertyFlagsList[i];
+             if (f == PropertyFlags::STYLED)
+-                  setProperty(spp.pid, styleValue(spp.pid, getPropertyStyle(spp.pid)));
++                  setProperty(spp.pid, safePropertyStyleValue(spp.pid));
+             ++i;
+             }
+       for (const StyledProperty& spp : *textStyle(tid())) {
+             PropertyFlags f = _propertyFlagsList[i];
+             if (f == PropertyFlags::STYLED)
+-                  setProperty(spp.pid, styleValue(spp.pid, getPropertyStyle(spp.pid)));
++                  setProperty(spp.pid, safePropertyStyleValue(spp.pid));
+             ++i;
+             }
+       }

@@ -1,0 +1,15 @@
+# debian/watch - check for a new upstream release and fetch it. See USCAN(1).
+# The script 'debian/repack' is called to perform changes for DFSG compliance.
+# Since repacking is used, do not add --rename when invoking uscan, please.
+version=4
+opts=\
+uversionmangle=s/%25/~/,\
+dversionmangle=s/\+dfsg\d*$//,\
+repack,\
+repacksuffix=+dfsg2,\
+compression=gz,\
+searchmode=plain,\
+filenamemangle=s/.+\/v?([0-9]+\.[0-9](?:[0-9.]*(?:%25pre)?[0-9]+)?)/MuseScore-$1.tar.gz/ \
+  https://api.github.com/repos/musescore/MuseScore/tags?per_page=200 \
+  https:[^"]*/tarball/refs/tags/v?(3\.(?=2\.)[0-9](?:[0-9.]*(?:%25pre)?[0-9]+)?)(?="|$) \
+debian debian/repack

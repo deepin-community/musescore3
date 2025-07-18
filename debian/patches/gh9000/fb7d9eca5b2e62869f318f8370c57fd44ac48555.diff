@@ -1,0 +1,72 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #329951: Deleting measures fails after pressing Ctrl+I/Cmd+I
+ by disabling that broken resp. never completed feature,
+ as in its current state it can lead to score corruption and
+ some other strange and unwanted side effects
+
+--- a/libmscore/cmd.cpp
++++ b/libmscore/cmd.cpp
+@@ -3752,7 +3752,6 @@ void Score::cmd(const QAction* a, EditDa
+             { "transpose-down",             [this]{ transposeSemitone(-1);                                      }},
+             { "delete",                     [this]{ cmdDeleteSelection();                                       }},
+             { "full-measure-rest",          [this]{ cmdFullMeasureRest();                                       }},
+-            { "toggle-insert-mode",         [this]{ _is.setInsertMode(!_is.insertMode());                       }},
+             { "pitch-up",                   [this]{ cmdPitchUp();                                               }},
+             { "pitch-down",                 [this]{ cmdPitchDown();                                             }},
+             { "time-delete",                [this]{ cmdTimeDelete();                                            }},
+--- a/mscore/data/shortcuts-Mac.xml
++++ b/mscore/data/shortcuts-Mac.xml
+@@ -990,8 +990,4 @@
+     <key>viewmode</key>
+     <seq>Ctrl+Shift+V</seq>
+     </SC>
+-  <SC>
+-    <key>toggle-insert-mode</key>
+-    <seq>Ctrl+I</seq>
+-    </SC>
+   </Shortcuts>
+--- a/mscore/data/shortcuts.xml
++++ b/mscore/data/shortcuts.xml
+@@ -1011,10 +1011,6 @@
+     <seq>Ctrl+Shift+V</seq>
+     </SC>
+   <SC>
+-    <key>toggle-insert-mode</key>
+-    <seq>Ctrl+I</seq>
+-    </SC>
+-  <SC>
+     <key>toggle-autoplace</key>
+     <seq>=</seq>
+     </SC>
+--- a/mscore/data/shortcuts_AZERTY.xml
++++ b/mscore/data/shortcuts_AZERTY.xml
+@@ -1026,8 +1026,4 @@
+     <key>viewmode</key>
+     <seq>Ctrl+Shift+V</seq>
+     </SC>
+-  <SC>
+-    <key>toggle-insert-mode</key>
+-    <seq>Ctrl+I</seq>
+-    </SC>
+   </Shortcuts>
+--- a/mscore/shortcut.cpp
++++ b/mscore/shortcut.cpp
+@@ -3607,16 +3607,6 @@ Shortcut Shortcut::_sc[] = {
+          },
+       {
+          MsWidget::MAIN_WINDOW,
+-         STATE_DISABLED | STATE_NORMAL | STATE_NOTE_ENTRY | STATE_EDIT | STATE_PLAY,
+-         "toggle-insert-mode",
+-         QT_TRANSLATE_NOOP("action","Toggle Insert Mode"),
+-         QT_TRANSLATE_NOOP("action","Toggle 'Insert Mode'"),
+-         0,
+-         Icons::Invalid_ICON,
+-         Qt::ApplicationShortcut
+-         },
+-      {
+-         MsWidget::MAIN_WINDOW,
+          STATE_ALL,
+          "show-tours",
+          QT_TRANSLATE_NOOP("action", "Show Tours"),

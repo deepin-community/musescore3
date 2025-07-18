@@ -1,0 +1,19 @@
+Origin: upstream, commit:03d2242b8b1537348986f54fc9c5e8baddbee94c
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #305941: changing octaves for ambiti doesn't work correctly
+
+--- a/libmscore/ambitus.cpp
++++ b/libmscore/ambitus.cpp
+@@ -698,10 +698,10 @@ bool Ambitus::setProperty(Pid propertyId
+                   setBottomPitch(v.toInt());
+                   break;
+             case Pid::FBPARENTHESIS3:        // recycled property = octave of _topPitch
+-                  setTopPitch(topPitch() % 12 + v.toInt() * 12);
++                  setTopPitch(topPitch() % 12 + (v.toInt() + 1) * 12);
+                   break;
+             case Pid::FBPARENTHESIS4:        // recycled property = octave of _bottomPitch
+-                  setBottomPitch(bottomPitch() % 12 + v.toInt() * 12);
++                  setBottomPitch(bottomPitch() % 12 + (v.toInt() + 1) * 12);
+                   break;
+             default:
+                   return Element::setProperty(propertyId, v);

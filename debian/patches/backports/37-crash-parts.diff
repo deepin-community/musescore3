@@ -1,0 +1,22 @@
+Origin: upstream, commit:c8a27535c248c357234e9a19bea850112c362793
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #297468: fix a crash on reading a corrupted score with linear layout mode in part
+ In a corrupted score tick values may sometimes be not synchronized
+ between master score and parts. This may lead to incorrect setting
+ of layoutAll flag as ticks from different scores are compared.
+ Ensuring that only master score ticks are compared fixes layoutAll
+ flag for scores corrupted that way and prevents a crash due to not
+ making a full layout on score loading. This change makes no
+ difference for correctly saved scores.
+
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -4364,7 +4364,7 @@ void Score::doLayoutRange(const Fraction
+             }
+ //      if (!_systems.isEmpty())
+ //            return;
+-      bool layoutAll = stick <= Fraction(0,1) && (etick < Fraction(0,1) || etick >= last()->endTick());
++      bool layoutAll = stick <= Fraction(0,1) && (etick < Fraction(0,1) || etick >= masterScore()->last()->endTick());
+       if (stick < Fraction(0,1))
+             stick = Fraction(0,1);
+       if (etick < Fraction(0,1))

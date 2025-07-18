@@ -1,0 +1,16 @@
+Description: drop libqt5sql5, which MuseScore does not, in fact, need
+Author: mirabilos <m@mirbsd.org>
+Forwarded: mentioned in dev chat
+Applied-Upstream: no
+Last-Update: 2020-07-12
+
+--- a/build/FindQt5.cmake
++++ b/build/FindQt5.cmake
+@@ -10,7 +10,6 @@ set(_components
+     Xml
+     XmlPatterns
+     Svg
+-    Sql
+     Widgets
+     PrintSupport
+     Concurrent

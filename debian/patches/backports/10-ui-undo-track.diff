@@ -1,0 +1,15 @@
+Origin: upstream, commit:a418fc96563e2ecc155402f321a61e6a47f1fb5f
+Author: James Thistlewood <jamesthistlewood@gmail.com>
+Description: fix #292024: chord symbols attached to fret diagrams in other staves
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -4420,7 +4420,7 @@ void Score::undoAddElement(Element* elem
+                         // make harmony child of fret diagram if possible
+                         if (ne->isHarmony()) {
+                               for (Element* segel : segment->annotations()) {
+-                                    if (segel->isFretDiagram()) {
++                                    if (segel && segel->isFretDiagram() && segel->track() == ntrack) {
+                                           ne->setTrack(segel->track());
+                                           ne->setParent(segel);
+                                           break;

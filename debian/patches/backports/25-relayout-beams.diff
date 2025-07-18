@@ -1,0 +1,20 @@
+Origin: upstream, commit:282386da9115b09cfc9682b2ec7105f3cd355084
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #294866: The direction of beamed notes does not immediately change when the beam is broken
+ Resolves: https://musescore.org/en/node/294866.
+ .
+ When a ChordRest is removed from its beam during layout, we need to
+ relayout its old beam. This will cause a recalculation of the stem
+ direction, in case it needs to change.
+
+--- a/libmscore/chordrest.cpp
++++ b/libmscore/chordrest.cpp
+@@ -790,6 +790,8 @@ void ChordRest::removeDeleteBeam(bool be
+             _beam->remove(this);
+             if (b->empty())
+                   score()->undoRemoveElement(b);
++            else
++                  b->layout1();
+             }
+       if (!beamed && isChord())
+             toChord(this)->layoutStem();

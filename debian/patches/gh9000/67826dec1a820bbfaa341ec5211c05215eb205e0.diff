@@ -1,0 +1,109 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Omar Emars <mail@OmarEmara.dev>
+Description: Fix #207346: Restrict first track to timing events
+ Currently, exported MIDI files will have data events in the first MIDI
+ track. While this is not forbidden by the standard, the industry
+ convention is to only put timing related events in the first track, in
+ which case it is called a tempo track. MuseScore should follow that
+ convention because a lot of the available software assumes this
+ convention. This has been discussed and agreed upon in:
+ https://musescore.org/en/node/207346
+
+--- a/mscore/exportmidi.cpp
++++ b/mscore/exportmidi.cpp
+@@ -31,11 +31,10 @@ namespace Ms {
+ //   writeHeader
+ //---------------------------------------------------------
+ 
+-void ExportMidi::writeHeader()
++void ExportMidi::writeHeader(MidiTrack& tempoTrack)
+       {
+       if (mf.tracks().isEmpty())
+             return;
+-      MidiTrack &track  = mf.tracks().front();
+ #if 0 // TODO
+       MeasureBase* measure  = cs->first();
+ 
+@@ -120,7 +119,7 @@ void ExportMidi::writeHeader()
+                   ev.setMetaType(META_TIME_SIGNATURE);
+                   ev.setEData(data);
+                   ev.setLen(4);
+-                  track.insert(pauseMap.addPauseTicks(is->first + tickOffset), ev);
++                  tempoTrack.insert(pauseMap.addPauseTicks(is->first + tickOffset), ev);
+                   }
+             }
+ 
+@@ -130,7 +129,7 @@ void ExportMidi::writeHeader()
+       //---------------------------------------------------
+ 
+       int staffIdx = 0;
+-      for (auto& track1: mf.tracks()) {
++      for (auto& track: mf.tracks()) {
+             Staff* staff  = cs->staff(staffIdx);
+             KeyList* keys = staff->keyList();
+ 
+@@ -154,7 +153,7 @@ void ExportMidi::writeHeader()
+                         data[1]   = 0;  // major
+                         ev.setEData(data);
+                         int tick = ik->first + tickOffset;
+-                        track1.insert(pauseMap.addPauseTicks(tick), ev);
++                        track.insert(pauseMap.addPauseTicks(tick), ev);
+                         if (tick == 0)
+                               initialKeySigFound = true;
+                         }
+@@ -171,7 +170,7 @@ void ExportMidi::writeHeader()
+                   data[0]   = key;
+                   data[1]   = 0;  // major
+                   ev.setEData(data);
+-                  track1.insert(0, ev);
++                  track.insert(0, ev);
+                   }
+ 
+             ++staffIdx;
+@@ -199,7 +198,7 @@ void ExportMidi::writeHeader()
+             data[1]   = tempo >> 8;
+             data[2]   = tempo;
+             ev.setEData(data);
+-            track.insert(it->first, ev);
++            tempoTrack.insert(it->first, ev);
+             }
+       }
+ 
+@@ -220,6 +219,8 @@ bool ExportMidi::write(QIODevice* device
+       mf.setDivision(MScore::division);
+       mf.setFormat(1);
+       QList<MidiTrack>& tracks = mf.tracks();
++      MidiTrack tempoTrack;
++      tempoTrack.setOutChannel(0);
+ 
+       for (int i = 0; i < cs->nstaves(); ++i)
+             tracks.append(MidiTrack());
+@@ -228,7 +229,7 @@ bool ExportMidi::write(QIODevice* device
+       cs->renderMidi(&events, false, midiExpandRepeats, synthState);
+ 
+       pauseMap.calculate(cs);
+-      writeHeader();
++      writeHeader(tempoTrack);
+ 
+       int staffIdx = 0;
+       for (auto &track: tracks) {
+@@ -332,6 +333,7 @@ bool ExportMidi::write(QIODevice* device
+                   }
+             ++staffIdx;
+             }
++      tracks.prepend(tempoTrack);
+       return !mf.write(device);
+       }
+ 
+--- a/mscore/exportmidi.h
++++ b/mscore/exportmidi.h
+@@ -47,7 +47,7 @@ class ExportMidi {
+ 
+       PauseMap pauseMap;
+ 
+-      void writeHeader();
++      void writeHeader(MidiTrack& tempoTrack);
+ 
+    public:
+       MidiFile mf;

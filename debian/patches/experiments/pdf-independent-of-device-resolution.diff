@@ -1,0 +1,85 @@
+Description: try to make PDFs generated independent of the screen,
+ the QT_QPA_PLATFORM device, and ideally the -D option’s DPI
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/libmscore/lyricsline.cpp
++++ b/libmscore/lyricsline.cpp
+@@ -417,7 +417,7 @@ void LyricsLineSegment::layout()
+             }
+       else {                              // dash(es)
+             // set conventional dash Y pos
+-            rypos() -= MScore::pixelRatio * lyr->fontMetrics().xHeight() * score()->styleD(Sid::lyricsDashYposRatio);
++            rypos() -= score()->styleD(Sid::lyricsDashYposRatio) * lyr->fontMetrics().xHeight() * DPI / lyr->fontMetrics().fontDpi();
+             _dashLength = score()->styleP(Sid::lyricsDashMaxLength) * mag();  // and dash length
+             qreal len         = pos2().x();
+             qreal minDashLen  = score()->styleS(Sid::lyricsDashMinLength).val() * sp;
+--- a/libmscore/textbase.cpp
++++ b/libmscore/textbase.cpp
+@@ -1660,7 +1660,7 @@ void TextBase::layoutFrame()
+ 
+ qreal TextBase::lineSpacing() const
+       {
+-      return fontMetrics().lineSpacing() * MScore::pixelRatio;
++      return fontMetrics().lineSpacing() * DPI / fontMetrics().fontDpi();
+       }
+ 
+ //---------------------------------------------------------
+@@ -2477,7 +2477,7 @@ QFont TextBase::font() const
+ 
+ QFontMetricsF TextBase::fontMetrics() const
+       {
+-      return QFontMetricsF(font());
++      return QFontMetricsF(font(), MScore::paintDevice());
+       }
+ 
+ //---------------------------------------------------------
+--- a/mscore/file.cpp
++++ b/mscore/file.cpp
+@@ -2062,7 +2062,9 @@ bool MuseScore::savePdf(Score* cs_, QPri
+ 
+       printer.setResolution(preferences.getInt(PREF_EXPORT_PDF_DPI));
+       QSizeF size(cs_->styleD(Sid::pageWidth), cs_->styleD(Sid::pageHeight));
+-      printer.setPaperSize(size, QPrinter::Inch);
++      QPageSize ps(QPageSize::id(size, QPageSize::Inch, QPageSize::FuzzyOrientationMatch));
++      printer.setPageSize(ps);
++      printer.setPageOrientation(size.width() > size.height() ? QPageLayout::Landscape : QPageLayout::Portrait);
+       printer.setFullPage(true);
+       printer.setColorMode(QPrinter::Color);
+ #if defined(Q_OS_MAC)
+@@ -2097,7 +2099,10 @@ bool MuseScore::savePdf(Score* cs_, QPri
+       p.setWindow(QRect(0.0, 0.0, size.width() * DPI, size.height() * DPI));
+ 
+       double pr = MScore::pixelRatio;
+-      MScore::pixelRatio = DPI / printer.logicalDpiX();
++      double mag_ = printer.logicalDpiX() / DPI;
++      MScore::pixelRatio = 1.0 / mag_;
++      //p.scale(mag_, mag_);
++      qDebug("not scaling by mag(%f) pixelRatio(%f)", mag_, MScore::pixelRatio);
+ 
+       const QList<Page*> pl = cs_->pages();
+       int pages = pl.size();
+@@ -2177,7 +2182,11 @@ bool MuseScore::savePdf(QList<Score*> cs
+                size1.height() * printer.logicalDpiY()));
+             p.setWindow(QRect(0.0, 0.0, size1.width() * DPI, size1.height() * DPI));
+ 
+-            MScore::pixelRatio = DPI / printer.logicalDpiX();
++            double mag_ = printer.logicalDpiX() / DPI;
++            MScore::pixelRatio = 1.0 / mag_;
++            //p.scale(mag_, mag_);
++            qDebug("not scaling by mag(%f) pixelRatio(%f)", mag_, MScore::pixelRatio);
++
+             const QList<Page*> pl = s->pages();
+             int pages    = pl.size();
+             for (int n = 0; n < pages; ++n) {
+--- a/mscore/musescore.cpp
++++ b/mscore/musescore.cpp
+@@ -1023,7 +1023,7 @@ MuseScore::MuseScore()
+                   guiScaling = 1.0;
+             }
+ 
+-      MScore::pixelRatio = DPI / screen->logicalDotsPerInch();
++      MScore::pixelRatio = DPI / (userDPI ? userDPI : screen->logicalDotsPerInch());
+ 
+       setObjectName("MuseScore");
+       _sstate = STATE_INIT;

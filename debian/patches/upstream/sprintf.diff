@@ -1,0 +1,25 @@
+Description: fix possible buffer overflow
+ compiler warning, very unlikely to hit in production
+ .
+ Better fix would be QString::asprintf() but Qt discourages that
+ for some unconceivable reason...
+Author: mirabilos <m@mirbsd.org>
+Forwarded: https://github.com/musescore/MuseScore/pull/5202
+Applied-Upstream: v3.3
+
+--- a/mscore/playpanel.cpp
++++ b/mscore/playpanel.cpp
+@@ -353,11 +353,11 @@ void PlayPanel::updatePosLabel(int utick
+       // alternative would be to use a monospaced font and a
+       // single label
+           
+-      char barBuffer[8];
++      char barBuffer[12];
+       sprintf(barBuffer, "%d", bar+1);// sprintf(barBuffer, "%03d", bar+1);
+       measureLabel->setText(QString(barBuffer));
+       
+-      char beatBuffer[8];
++      char beatBuffer[12];
+       sprintf(beatBuffer, "%02d", beat+1);
+       beatLabel->setText(QString(beatBuffer));
+       }

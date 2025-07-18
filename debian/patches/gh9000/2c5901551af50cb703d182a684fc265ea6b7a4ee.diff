@@ -1,0 +1,34 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix GH#10653: Crash converting to whole note twice, on a certain score.
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -3816,6 +3816,8 @@ static Element* findLinkedVoiceElement(E
+       Measure* measure = segment->measure();
+       Measure* m       = score->tick2measure(measure->tick());
+       Segment* s       = m->findSegment(segment->segmentType(), segment->tick());
++      if (!s)
++            return 0;
+       return s->element(dtrack);
+       }
+ 
+@@ -3855,6 +3857,8 @@ static Chord* findLinkedChord(Chord* c,
+       Segment* s  = c->segment();
+       Measure* nm = nstaff->score()->tick2measure(s->tick());
+       Segment* ns = nm->findSegment(s->segmentType(), s->tick());
++      if (!ns)
++            return 0;
+       Element* ne = ns->element(dtrack);
+       if (!ne->isChord())
+             return 0;
+@@ -4559,6 +4563,8 @@ void Score::undoAddElement(Element* elem
+                         if (cr1->staffIdx() != cr2->staffIdx())
+                               sm = cr2->staffIdx() - cr1->staffIdx();
+                         Chord* c1 = findLinkedChord(cr1, score->staff(staffIdx));
++                        if (!c1)
++                              return;
+                         Chord* c2 = findLinkedChord(cr2, score->staff(staffIdx + sm));
+                         Note* nn1 = c1->findNote(n1->pitch());
+                         Note* nn2 = c2 ? c2->findNote(n2->pitch()) : 0;

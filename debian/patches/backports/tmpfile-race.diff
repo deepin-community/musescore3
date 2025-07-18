@@ -1,0 +1,35 @@
+Origin: upstream, commit:c041e7b111c41266e0be3494c96854e8945e3b38
+Author: Roman Pudashkin <r.pudashkin@gmail.com>
+Description: replaced QFile with QTemporaryFile
+
+--- a/mscore/file.cpp
++++ b/mscore/file.cpp
+@@ -3263,17 +3263,19 @@ bool MuseScore::exportMp3AsJSON(const QS
+ 
+ QByteArray MuseScore::exportPdfAsJSON(Score* score)
+       {
++      QTemporaryFile tempPdfFile;
++      bool ok = tempPdfFile.open();
++
++      if (!ok) {
++          return QByteArray();
++      }
++
+       QPrinter printer;
+-      auto tempPdfFileName = "/tmp/MUTempPdf.pdf";
+-      printer.setOutputFileName(tempPdfFileName);
++      printer.setOutputFileName(tempPdfFile.fileName());
+       mscore->savePdf(score, printer);
+-      QFile tempPdfFile(tempPdfFileName);
+-      QByteArray pdfData;
+-      if (tempPdfFile.open(QIODevice::ReadWrite)) {
+-            pdfData = tempPdfFile.readAll();
+-            tempPdfFile.close();
+-            tempPdfFile.remove();
+-            }
++
++      QByteArray pdfData = tempPdfFile.readAll();
++      tempPdfFile.close();
+ 
+       return pdfData.toBase64();
+       }

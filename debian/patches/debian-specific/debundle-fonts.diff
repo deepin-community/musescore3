@@ -1,0 +1,63 @@
+Description: Don’t bundle fonts-freefont-ttf in the executable,
+ use the system copy (even if this means rendering will differ
+ from other places and musescore.com, the local user will get
+ the bugfixes applied to the Debian packaging of said fonts)
+ .
+ This was discussed around the Campania debate; basically, both
+ embedding and depending have upsides and downsides… ☹
+ .
+ Considering MuseScore is GPLv2 and the font is GPLv3+FE though
+ it’s safer to not embed it into the binary at all.
+Author: mirabilos <tg@debian.org>
+Forwarded: not-needed
+Justification: distribution-specific packaging
+
+--- a/libmscore/mscore.cpp
++++ b/libmscore/mscore.cpp
+@@ -347,11 +347,13 @@ void MScore::init()
+ #if !defined(Q_OS_MAC) && !defined(Q_OS_IOS)
+       static const char* fonts[] = {
+             ":/fonts/musejazz/MuseJazzText.otf",
++#if 0
+             ":/fonts/FreeSans.ttf",
+             ":/fonts/FreeSerif.ttf",
+             ":/fonts/FreeSerifBold.ttf",
+             ":/fonts/FreeSerifItalic.ttf",
+             ":/fonts/FreeSerifBoldItalic.ttf",
++#endif
+             ":/fonts/mscoreTab.ttf",
+             ":/fonts/mscore-BC.ttf",
+             ":/fonts/bravura/BravuraText.otf",
+--- a/mscore/CMakeLists.txt
++++ b/mscore/CMakeLists.txt
+@@ -207,8 +207,6 @@ else (APPLE)
+             musescorefonts-Gootville.qrc
+             musescorefonts-Bravura.qrc
+             musescorefonts-MuseJazz.qrc
+-            musescorefonts-FreeSerif.qrc
+-            musescorefonts-Free.qrc
+             shortcut.qrc)
+ endif (APPLE)
+ 
+--- a/mtest/CMakeLists.txt
++++ b/mtest/CMakeLists.txt
+@@ -37,8 +37,6 @@ QT5_ADD_RESOURCES(qrc_files ${PROJECT_SO
+             ${PROJECT_SOURCE_DIR}/mscore/musescorefonts-Gootville.qrc
+             ${PROJECT_SOURCE_DIR}/mscore/musescorefonts-Bravura.qrc
+             ${PROJECT_SOURCE_DIR}/mscore/musescorefonts-MuseJazz.qrc
+-            ${PROJECT_SOURCE_DIR}/mscore/musescorefonts-Free.qrc
+-            ${PROJECT_SOURCE_DIR}/mscore/musescorefonts-FreeSerif.qrc
+       )
+ 
+ add_library (testResources STATIC
+--- a/mtest/testutils.cpp
++++ b/mtest/testutils.cpp
+@@ -34,8 +34,6 @@ inline void initMyResources() {
+       Q_INIT_RESOURCE(musescorefonts_Gootville);
+       Q_INIT_RESOURCE(musescorefonts_Bravura);
+       Q_INIT_RESOURCE(musescorefonts_MuseJazz);
+-      Q_INIT_RESOURCE(musescorefonts_FreeSerif);
+-      Q_INIT_RESOURCE(musescorefonts_Free);
+ }
+ 
+ extern Ms::Score::FileError importOve(Ms::MasterScore*, const QString& name);

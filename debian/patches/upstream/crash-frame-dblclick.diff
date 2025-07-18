@@ -1,0 +1,36 @@
+Origin: upstream, commit:9c017b7c0c1a861811d5f598690eceef384bf46d
+Author: James Thistlewood <jamesthistlewood@gmail.com>
+Description: fix #300855: Trying to add text to a vertical/horizontal
+ frame after double click causes crash
+ .
+ The crash is caused by ed.getData(t) failing and returning nullptr,
+ where t is the newly added text element and ed is the score edit data.
+ The interesting thing is that this didn't return nullptr when not in
+ edit mode already before adding the text - it was only a problem when
+ adding text when already in edit mode. The line of relevance that is
+ the root of this whole problem is, in ScoreView::changeState:
+ .
+ if (s == state)
+       return;
+ .
+ where s is the new state and state is the current one. This is right at
+ the start, so if we're already in edit mode, then the crucial
+ startEdit() call further down the function won't happen. Of course,
+ startEdit is the bit that's responsible for clearing the edit data and
+ adding the new edit data for the new text element. So, when it doesn't
+ run, there's no edit data for the new text. And when there's no edit
+ data, getData fails. And when getData fails, text->cursor(ed) crashes
+ on a Q_ASSERT.
+
+--- a/mscore/editelement.cpp
++++ b/mscore/editelement.cpp
+@@ -92,6 +92,9 @@ void ScoreView::startEditMode(Element* e
+             }
+       if (score()->undoStack()->active())
+             score()->endCmd();
++      // Restart edit mode to reinit edit values
++      if (editMode())
++            changeState(ViewState::NORMAL);
+       editData.element = e;
+       changeState(ViewState::EDIT);
+       }

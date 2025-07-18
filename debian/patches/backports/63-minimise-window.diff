@@ -1,0 +1,152 @@
+Origin: upstream, commit:6804243e6671fa6a4961d8d2ded408cefddaf1ce
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #298820: fix inability to minimize MuseScore on Linux with Gnome-based desktop environments
+ The issue happens if some QML view is opened, e.g. a plugin dock or,
+ more importantly, Palettes panel. Fixes the issue by leaving the code
+ in Mixer and Play Panel forcing a window to take focus only in cases
+ when it might make sense: when opening the corresponding widget and
+ when unminimizing MuseScore if the widget is in floating state (otherwise
+ it won't take focus). This is enough to avoid triggering the issue
+ which happens only if Play Panel or Mixer is docked.
+
+--- a/mscore/mixer.cpp
++++ b/mscore/mixer.cpp
+@@ -237,7 +237,7 @@ void Mixer::retranslate(bool firstTime)
+ void Mixer::closeEvent(QCloseEvent* ev)
+       {
+       emit closed(false);
+-      QWidget::closeEvent(ev);
++      QDockWidget::closeEvent(ev);
+       }
+ 
+ //---------------------------------------------------------
+@@ -246,11 +246,18 @@ void Mixer::closeEvent(QCloseEvent* ev)
+ 
+ void Mixer::showEvent(QShowEvent* e)
+       {
+-      enablePlay->showEvent(e);
+-      QWidget::showEvent(e);
+-      activateWindow();
+-      setFocus();
+-      getAction("toggle-mixer")->setChecked(true);
++      if (e->spontaneous() && !isFloating()) {
++            QDockWidget::showEvent(e);
++            }
++      else {
++            enablePlay->showEvent(e);
++            QDockWidget::showEvent(e);
++            activateWindow();
++            setFocus();
++            }
++
++      if (!e->spontaneous())
++            getAction("toggle-mixer")->setChecked(true);
+       }
+ 
+ 
+@@ -260,8 +267,9 @@ void Mixer::showEvent(QShowEvent* e)
+ 
+ void Mixer::hideEvent(QHideEvent* e)
+       {
+-      QWidget::hideEvent(e);
+-      getAction("toggle-mixer")->setChecked(false);
++      QDockWidget::hideEvent(e);
++      if (!e->spontaneous())
++            getAction("toggle-mixer")->setChecked(false);
+       }
+ 
+ 
+@@ -273,7 +281,7 @@ bool Mixer::eventFilter(QObject* obj, QE
+       {
+       if (enablePlay->eventFilter(obj, e))
+             return true;
+-      return QWidget::eventFilter(obj, e);
++      return QDockWidget::eventFilter(obj, e);
+       }
+ 
+ //---------------------------------------------------------
+@@ -285,7 +293,7 @@ void Mixer::keyPressEvent(QKeyEvent* ev)
+             close();
+             return;
+             }
+-      QWidget::keyPressEvent(ev);
++      QDockWidget::keyPressEvent(ev);
+       }
+ 
+ //---------------------------------------------------------
+@@ -294,7 +302,7 @@ void Mixer::keyPressEvent(QKeyEvent* ev)
+ 
+ void Mixer::changeEvent(QEvent *event)
+       {
+-      QWidget::changeEvent(event);
++      QDockWidget::changeEvent(event);
+       if (event->type() == QEvent::LanguageChange)
+             retranslate();
+       }
+--- a/mscore/playpanel.cpp
++++ b/mscore/playpanel.cpp
+@@ -126,7 +126,7 @@ void PlayPanel::relTempoChanged()
+ void PlayPanel::closeEvent(QCloseEvent* ev)
+       {
+       emit closed(false);
+-      QWidget::closeEvent(ev);
++      QDockWidget::closeEvent(ev);
+       }
+ 
+ //---------------------------------------------------------
+@@ -141,7 +141,7 @@ void PlayPanel::closeEvent(QCloseEvent*
+ void PlayPanel::hideEvent(QHideEvent* ev)
+       {
+       MuseScore::saveGeometry(this);
+-      QWidget::hideEvent(ev);
++      QDockWidget::hideEvent(ev);
+       }
+ 
+ //---------------------------------------------------------
+@@ -150,10 +150,15 @@ void PlayPanel::hideEvent(QHideEvent* ev
+ 
+ void PlayPanel::showEvent(QShowEvent* e)
+       {
+-      enablePlay->showEvent(e);
+-      QWidget::showEvent(e);
+-      activateWindow();
+-      setFocus();
++      if (e->spontaneous() && !isFloating()) {
++            QDockWidget::showEvent(e);
++            }
++      else {
++            enablePlay->showEvent(e);
++            QDockWidget::showEvent(e);
++            activateWindow();
++            setFocus();
++            }
+       }
+ 
+ //---------------------------------------------------------
+@@ -164,7 +169,7 @@ bool PlayPanel::eventFilter(QObject* obj
+       {
+       if (enablePlay->eventFilter(obj, e))
+             return true;
+-      return QWidget::eventFilter(obj, e);
++      return QDockWidget::eventFilter(obj, e);
+       }
+ 
+ void PlayPanel::keyPressEvent(QKeyEvent* ev) {
+@@ -172,7 +177,7 @@ void PlayPanel::keyPressEvent(QKeyEvent*
+             close();
+             return;
+             }
+-      QWidget::keyPressEvent(ev);
++      QDockWidget::keyPressEvent(ev);
+       }
+ 
+ //---------------------------------------------------------
+@@ -406,7 +411,7 @@ void PlayPanel::tempoSliderReleased(int)
+ 
+ void PlayPanel::changeEvent(QEvent *event)
+       {
+-      QWidget::changeEvent(event);
++      QDockWidget::changeEvent(event);
+       if (event->type() == QEvent::LanguageChange)
+             retranslate();
+       }

@@ -1,0 +1,330 @@
+Description: enable importmidi’s debugging code
+ Without this, it FTBFS as it assumes the body of an assertion
+ is never evaluated if !QT_DEBUG and doesn’t define the methods
+ the asserts use then :/ and we generally want to have the checks.
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/all.h
++++ b/all.h
+@@ -34,6 +34,8 @@
+    #define _HAS_AUTO_PTR_ETC 1
+ #endif
+ 
++#define IMPORTMIDI_DEBUG
++
+ #include <stdio.h>
+ #include <limits.h>
+ #include <map>
+--- a/mscore/importmidi/importmidi.cpp
++++ b/mscore/importmidi/importmidi.cpp
+@@ -85,7 +85,7 @@ void lengthenTooShortNotes(std::multimap
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool doNotesOverlap(const MTrack &track)
+       {
+--- a/mscore/importmidi/importmidi_chord.cpp
++++ b/mscore/importmidi/importmidi_chord.cpp
+@@ -197,7 +197,7 @@ void removeOverlappingNotes(std::multima
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ // check for equal on time values with the same voice that is invalid
+ bool areOnTimeValuesDifferent(const std::multimap<ReducedFraction, MidiChord> &chords)
+@@ -598,7 +598,7 @@ void setBarIndexes(
+                   continue;
+             for (; it != chords.end(); ++it) {
+                   const auto onTime = Quantize::findQuantizedChordOnTime(*it, basicQuant);
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+                   const auto barStart = ReducedFraction::fromTicks(sigmap->bar2tick(barIndex, 0));
+                   Q_ASSERT_X(!(it->first >= barStart && onTime < barStart),
+                              "MChord::setBarIndexes", "quantized on time cannot be in previous bar");
+--- a/mscore/importmidi/importmidi_chord.h
++++ b/mscore/importmidi/importmidi_chord.h
+@@ -135,7 +135,7 @@ void setBarIndexes(
+             const ReducedFraction &basicQuant,
+             const ReducedFraction &lastTick, const TimeSigMap *sigmap);
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areOnTimeValuesDifferent(const std::multimap<ReducedFraction, MidiChord> &chords);
+ bool areBarIndexesSuccessive(const std::multimap<ReducedFraction, MidiChord> &chords);
+--- a/mscore/importmidi/importmidi_clef.cpp
++++ b/mscore/importmidi/importmidi_clef.cpp
+@@ -147,7 +147,7 @@ MinMaxPitch findMinMaxSegPitch(const Seg
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool doesClefBreakTie(const Staff *staff)
+       {
+--- a/mscore/importmidi/importmidi_drum.cpp
++++ b/mscore/importmidi/importmidi_drum.cpp
+@@ -16,7 +16,7 @@ namespace Ms {
+ namespace MidiDrum {
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool haveNonZeroVoices(const std::multimap<ReducedFraction, MidiChord> &chords)
+       {
+--- a/mscore/importmidi/importmidi_fraction.cpp
++++ b/mscore/importmidi/importmidi_fraction.cpp
+@@ -6,7 +6,7 @@
+ 
+ namespace Ms {
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ //---------------------------------------------------------------------------------------
+ // https://www.securecoding.cert.org/confluence/display/seccode/
+--- a/mscore/importmidi/importmidi_lrhand.cpp
++++ b/mscore/importmidi/importmidi_lrhand.cpp
+@@ -36,7 +36,7 @@ bool needToSplit(const std::multimap<Red
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areNotesSortedByPitchInAscOrder(const QList<MidiNote>& notes)
+       {
+--- a/mscore/importmidi/importmidi_lyrics.cpp
++++ b/mscore/importmidi/importmidi_lyrics.cpp
+@@ -60,7 +60,7 @@ extractLyricsFromTrack(const MidiTrack &
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areEqualIndexesSuccessive(const QList<MTrack> &tracks)
+       {
+--- a/mscore/importmidi/importmidi_quant.cpp
++++ b/mscore/importmidi/importmidi_quant.cpp
+@@ -556,7 +556,7 @@ struct QuantData
+       };
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areAllVoicesSame(
+             const std::deque<std::multimap<ReducedFraction, MidiChord>::const_iterator> &chords)
+@@ -1177,7 +1177,7 @@ void quantizeOffTimes(
+                                                             quantizedChords, basicQuant);
+                   note.offTime = result.first;
+                   note.offTimeQuant = result.second;
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+                   checkOffTime(note, chordIt, quantizedChords);
+ #endif
+                   }
+@@ -1359,7 +1359,7 @@ findQuantizedChords(
+                               fc.isInTuplet = true;
+                               fc.tuplet = chord.tuplet;
+                               }
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+                         else {
+                               Q_ASSERT_X(fc.tuplet == chord.tuplet,
+                                          "Quantize::findQuantizedChords",
+--- a/mscore/importmidi/importmidi_simplify.cpp
++++ b/mscore/importmidi/importmidi_simplify.cpp
+@@ -30,7 +30,7 @@ bool hasComplexBeamedDurations(const QLi
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areDurationsEqual(
+             const QList<std::pair<ReducedFraction, TDuration> > &durations,
+--- a/mscore/importmidi/importmidi_tie.cpp
++++ b/mscore/importmidi/importmidi_tie.cpp
+@@ -17,7 +17,7 @@
+ #include "libmscore/chord.h"
+ #include "libmscore/note.h"
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ #include "libmscore/staff.h"
+ #include "libmscore/score.h"
+ #include "libmscore/measure.h"
+@@ -92,7 +92,7 @@ void TieStateMachine::addSeg(const Segme
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ void printInconsistentTieLocation(int measureIndex, int staffIndex)
+       {
+--- a/mscore/importmidi/importmidi_tie.h
++++ b/mscore/importmidi/importmidi_tie.h
+@@ -34,7 +34,7 @@ class TieStateMachine
+       };
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ bool areTiesConsistent(const Staff *staff);
+ #endif
+ 
+--- a/mscore/importmidi/importmidi_tuplet.cpp
++++ b/mscore/importmidi/importmidi_tuplet.cpp
+@@ -531,7 +531,7 @@ void addChordsBetweenTupletNotes(
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool doTupletsHaveCommonChords(const std::vector<TupletInfo> &tuplets)
+       {
+@@ -839,7 +839,7 @@ void addTupletEvents(std::multimap<Reduc
+                   if (tiedTuplet.tupletId == tupletInfo.id) {
+                         MidiChord &midiChord = tiedTuplet.chord->second;
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+                         QString message = "Tied tuplet and tied chord have different voices, "
+                                           "tuplet voice = ";
+                         message += QString::number(tiedTuplet.voice) + ", chord voice = ";
+@@ -1141,7 +1141,7 @@ void findAllTuplets(
+                               // chords at the end of the current bar
+                               // may have changed bar index - from next bar to the current bar
+                               // because they were included in tuplets
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+                         bool nextBarFound = false;
+ #endif
+                         const auto endBarTick = ReducedFraction::fromTicks(
+@@ -1156,7 +1156,7 @@ void findAllTuplets(
+ 
+                                     ++endBarIt;
+                                     }
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+                               if (it->second.barIndex > currentBarIndex)
+                                     nextBarFound = true;
+ #endif
+--- a/mscore/importmidi/importmidi_tuplet.h
++++ b/mscore/importmidi/importmidi_tuplet.h
+@@ -112,7 +112,7 @@ ReducedFraction findOnTimeBetweenChords(
+             const ReducedFraction &basicQuant,
+             const ReducedFraction &barStart);
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areAllTupletsReferenced(
+             const std::multimap<ReducedFraction, MidiChord> &chords,
+--- a/mscore/importmidi/importmidi_tuplet_filter.cpp
++++ b/mscore/importmidi/importmidi_tuplet_filter.cpp
+@@ -276,7 +276,7 @@ TupletErrorResult findTupletError(
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areCommonsDifferent(const std::vector<int> &selectedCommons)
+       {
+@@ -387,7 +387,7 @@ bool canUseIndex(
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areTupletChordsEmpty(const std::vector<TupletInfo> &tuplets)
+       {
+--- a/mscore/importmidi/importmidi_tuplet_tonotes.cpp
++++ b/mscore/importmidi/importmidi_tuplet_tonotes.cpp
+@@ -23,7 +23,7 @@ void addElementToTuplet(int voice,
+       {
+       const auto foundTuplets = findTupletsForTimeRange(voice, onTime, len, tuplets, true);
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+       if (foundTuplets.size() > 1) {
+             qDebug() << "Measure number (from 1):" << el->measure()->no() + 1
+                      << ", staff index (from 0):" << el->staff()->idx();
+@@ -73,7 +73,7 @@ void createTupletNotes(
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ void printInvalidTupletLocation(int measureIndex, int staffIndex)
+       {
+--- a/mscore/importmidi/importmidi_tuplet_tonotes.h
++++ b/mscore/importmidi/importmidi_tuplet_tonotes.h
+@@ -21,7 +21,7 @@ void addElementToTuplet(int voice,
+ void createTupletNotes(Staff *staff,
+                        const std::multimap<ReducedFraction, TupletData> &tuplets);
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ bool haveTupletsEnoughElements(const Staff *staff);
+ #endif
+ 
+--- a/mscore/importmidi/importmidi_tuplet_voice.cpp
++++ b/mscore/importmidi/importmidi_tuplet_voice.cpp
+@@ -182,7 +182,7 @@ void setNonTupletVoices(
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areAllElementsUnique(
+             const std::list<std::multimap<ReducedFraction, MidiChord>::iterator> &nonTuplets)
+--- a/mscore/importmidi/importmidi_tuplet_voice.h
++++ b/mscore/importmidi/importmidi_tuplet_voice.h
+@@ -54,7 +54,7 @@ chordInterval(const std::pair<const Redu
+               const ReducedFraction &basicQuant,
+               const ReducedFraction &barStart);
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool haveOverlappingVoices(
+             const std::list<std::multimap<ReducedFraction, MidiChord>::iterator> &nonTuplets,
+--- a/mscore/importmidi/importmidi_voice.cpp
++++ b/mscore/importmidi/importmidi_voice.cpp
+@@ -45,7 +45,7 @@ int voiceLimit()
+       }
+ 
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areNotesSortedByOffTimeInAscOrder(
+             const QList<MidiNote>& notes,
+--- a/mscore/importmidi/importmidi_voice.h
++++ b/mscore/importmidi/importmidi_voice.h
+@@ -31,7 +31,7 @@ bool splitChordToVoice(
+       const ReducedFraction &maxChordLength,
+       bool allowParallelTuplets = false);
+ 
+-#ifdef QT_DEBUG
++#ifdef IMPORTMIDI_DEBUG
+ 
+ bool areVoicesSame(const std::multimap<ReducedFraction, MidiChord> &chords);
+ 

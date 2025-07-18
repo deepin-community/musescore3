@@ -1,0 +1,39 @@
+Description: document GUI-independent way of doing batch converts
+ It should not need -D 360 in mu͒3 with all our patches applied.
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/build/Linux+BSD/mscore.1.in
++++ b/build/Linux+BSD/mscore.1.in
+@@ -3,7 +3,7 @@
+ .\"	mirabilos <m@mirbsd.org>
+ .\" Published under the same terms as MuseScore itself.
+ .\"-
+-.Dd April 21, 2025
++.Dd April 22, 2025
+ .Dt @MAN_MSCORE_UPPER@ 1
+ .Os MuseScore
+ .Sh NAME@Variables_substituted_by_CMAKE_on_installation@
+@@ -423,12 +423,18 @@ key and time signatures and shortcuts.
+ See above for development version paths.
+ .Sh EXAMPLES
+ Convert a score to PDF from the command line:
+-.Pp
+-.Dl Nm Fl o No "\(aqMy Score.pdf\(aq" "\(aqMy Score.mscz\(aq"
++.Bd -literal -offset indent
++QT_QPA_PLATFORM=offscreen; export QT_QPA_PLATFORM  # sh
++setenv QT_QPA_PLATFORM offscreen                   # csh
++.Nm Fl o No "\(aqMy Score.pdf\(aq" "\(aqMy Score.mscz\(aq"
++.Ed
+ .Pp
+ Run a batch job converting multiple documents:
+-.Pp
+-.Dl Nm Fl j No job.json
++.Bd -literal -offset indent
++QT_QPA_PLATFORM=offscreen; export QT_QPA_PLATFORM  # sh
++setenv QT_QPA_PLATFORM offscreen                   # csh
++.Nm Fl j No job.json
++.Ed
+ .Pp
+ This requires the file
+ .Pa job.json

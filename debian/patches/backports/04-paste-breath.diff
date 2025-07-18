@@ -1,0 +1,23 @@
+Origin: upstream, commit:a4a5173e03050bc9d93e30fecab9f170148be135
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #291932: Copy-paste breaths & pauses causes bad layout of the first note/rest in following measures
+ Copying and pasting a breath mark on the last tick of a measure
+ resulted in an empty Breath segment being created in the next measure.
+ This is because the last tick of one measure is equal to the first tick
+ of the next measure, and Score::tick2measure() always returns the
+ second measure in this case. When the Breath mark actually gets added
+ to the score in Score::undoAddElement(), a new segment for it is
+ created in the previous measure. This is the measure in which we should
+ be adding the segment in the first place.
+
+--- a/libmscore/paste.cpp
++++ b/libmscore/paste.cpp
+@@ -395,6 +395,8 @@ bool Score::pasteStaff(XmlReader& e, Seg
+                               breath->setTrack(e.track());
+                               Fraction tick = doScale ? (e.tick() - dstTick) * scale + dstTick : e.tick();
+                               Measure* m = tick2measure(tick);
++                              if (m->tick() == tick)
++                                    m = m->prevMeasure();
+                               Segment* segment = m->undoGetSegment(SegmentType::Breath, tick);
+                               breath->setParent(segment);
+                               undoChangeElement(segment->element(e.track()), breath);

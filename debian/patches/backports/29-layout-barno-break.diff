@@ -1,0 +1,28 @@
+Origin: upstream, commit:9f1f5409172e8aa1538b19c755854f5a6bbe9625
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #292343: measure numbers restart from 1 after section break even if the corresponding property got disabled
+ Some calls of `sectionBreak()` should be changed to
+ `sectionBreakElement()` so the property can be accessed by
+ `sectionBreakElement()->startWithMeasureOne()`.
+
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -2248,7 +2248,7 @@ int LayoutContext::adjustMeasureNo(Measu
+       m->setNo(measureNo);
+       if (!m->irregular())          // don’t count measure
+             ++measureNo;
+-      if (m->sectionBreak())
++      if (m->sectionBreakElement() && m->sectionBreakElement()->startWithMeasureOne())
+             measureNo = 0;
+       return measureNo;
+       }
+@@ -4439,7 +4439,8 @@ void Score::doLayoutRange(const Fraction
+                   lc.tick      = Fraction(0,1);
+                   }
+             else {
+-                  if (lc.nextMeasure->prevMeasure()->sectionBreak())
++                  LayoutBreak* sectionBreak = lc.nextMeasure->prevMeasure()->sectionBreakElement();
++                  if (sectionBreak && sectionBreak->startWithMeasureOne())
+                         lc.measureNo = 0;
+                   else
+                         lc.measureNo = lc.nextMeasure->prevMeasure()->no() + 1; // will be adjusted later with respect

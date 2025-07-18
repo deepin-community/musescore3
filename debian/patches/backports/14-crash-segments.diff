@@ -1,0 +1,28 @@
+Origin: upstream, commit:32cbcfe03499e05b09099e28c6b994fc53912c1c
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #293460: Crash when loading file with orphan Segment tags
+ correct broken files on the fly and don't create them anymore.
+
+--- a/libmscore/measure.cpp
++++ b/libmscore/measure.cpp
+@@ -2366,7 +2366,7 @@ void Measure::readVoice(XmlReader& e, in
+                         }
+                   startingBeam = beam;
+                   }
+-            else if (tag == "Segment")
++            else if (tag == "Segment" && segment)
+                   segment->read(e);
+             else if (tag == "Ambitus") {
+                   Ambitus* range = new Ambitus(score());
+--- a/libmscore/scorefile.cpp
++++ b/libmscore/scorefile.cpp
+@@ -1286,7 +1286,8 @@ void Score::writeSegments(XmlWriter& xml
+                         cr->writeTupletEnd(xml);
+                         }
+ 
+-                  segment->write(xml);    // write only once
++                  if (!(e->isRest() && toRest(e)->isGap()))
++                        segment->write(xml);    // write only once
+                   if (forceTimeSig) {
+                         if (segment->segmentType() == SegmentType::KeySig)
+                               keySigWritten = true;

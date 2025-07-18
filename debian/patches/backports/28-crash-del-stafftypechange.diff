@@ -1,0 +1,28 @@
+Origin: upstream, commit:c4f477603ae468d911cc56eed5ab7ea1da08c4b0
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #295898: Deleting a StaffTypeChange causes a crash in macOS
+
+--- a/libmscore/measure.cpp
++++ b/libmscore/measure.cpp
+@@ -1002,7 +1002,8 @@ void Measure::remove(Element* e)
+                         // st currently points to an list element that is about to be removed
+                         // make a copy now to use on undo/redo
+                         StaffType* st = new StaffType(*stc->staffType());
+-                        staff->removeStaffType(tick());
++                        if (!tick().isZero())
++                              staff->removeStaffType(tick());
+                         stc->setStaffType(st);
+                         }
+                   MeasureBase::remove(e);
+--- a/libmscore/staff.cpp
++++ b/libmscore/staff.cpp
+@@ -1403,8 +1403,7 @@ QVariant Staff::propertyDefault(Pid id)
+ void Staff::localSpatiumChanged(double oldVal, double newVal, Fraction tick)
+       {
+       Fraction etick;
+-      auto i = _staffTypeList.find(tick.ticks());
+-      ++i;
++      auto i = _staffTypeList.upper_bound(tick.ticks());
+       if (i == _staffTypeList.end())
+             etick = score()->lastSegment()->tick();
+       else

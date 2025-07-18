@@ -1,0 +1,25 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: François-Xavier Thomas <fxthomas@users.noreply.github.com>
+Description: Fix #321716: Fix entering 8th notes in REALTIME MIDI input modes
+ When comparing a Fraction (ticks2measureEnd) to the TDuration of the note being entered
+ (is.duration()), the Fraction is implicitly converted by the TDuration(const Fraction&) ctor.
+ Because of extra logic in TDuration, this can trigger a Q_ASSERT and crash Musescore in case the
+ remaining Fraction cannot be exactly converted into a proper TDuration.  In this case, this point is
+ reached when ticks2measureEnd = 5/8 and is.duration() = 1/8.
+ .
+ Since what we really want here is to compare the Fraction to the exact note duration (and not the
+ other way around), we can just do an exact comparison between is.duration().fraction() and
+ ticks2measureEnd to achieve the same goal.
+
+--- a/libmscore/noteentry.cpp
++++ b/libmscore/noteentry.cpp
+@@ -162,7 +162,7 @@ Note* Score::addPitch(NoteVal& nval, boo
+             //   We could split the duration at the barline and continue into the next bar, but this would create extra
+             //   notes, extra ties, and extra pain. Instead, we simply truncate the duration at the barline.
+             Fraction ticks2measureEnd = _is.segment()->measure()->ticks() - _is.segment()->rtick();
+-            duration = _is.duration() > ticks2measureEnd ? ticks2measureEnd : _is.duration().fraction();
++            duration = _is.duration().fraction() > ticks2measureEnd ? ticks2measureEnd : _is.duration().fraction();
+             }
+       else {
+             duration = _is.duration().fraction();

@@ -1,0 +1,72 @@
+Origin: upstream, commit:ec7d9a85d79b45c558a4230ef35251122167064e
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #275268: don't list non-plugin QML files in Plugin Manager
+
+--- a/mscore/musescore.h
++++ b/mscore/musescore.h
+@@ -908,7 +908,7 @@ extern bool saveXml(Score*, QIODevice*);
+ extern bool saveXml(Score*, const QString& name);
+ 
+ struct PluginDescription;
+-extern void collectPluginMetaInformation(PluginDescription*);
++extern bool collectPluginMetaInformation(PluginDescription*);
+ extern QString getSharePath();
+ 
+ extern Score::FileError importMidi(MasterScore*, const QString& name);
+--- a/mscore/plugin/mscorePlugins.cpp
++++ b/mscore/plugin/mscorePlugins.cpp
+@@ -381,8 +381,8 @@ bool MuseScore::loadPlugin(const QString
+                   PluginDescription* p = new PluginDescription;
+                   p->path = path;
+                   p->load = false;
+-                  collectPluginMetaInformation(p);
+-                  registerPlugin(p);
++                  if (collectPluginMetaInformation(p))
++                        registerPlugin(p);
+                   result = true;
+                   }
+             }
+@@ -478,9 +478,11 @@ void MuseScore::pluginTriggered(QString
+ 
+ //---------------------------------------------------------
+ //   collectPluginMetaInformation
++///   returns false if loading a plugin for the given
++///   description has failed
+ //---------------------------------------------------------
+ 
+-void collectPluginMetaInformation(PluginDescription* d)
++bool collectPluginMetaInformation(PluginDescription* d)
+       {
+       qDebug("Collect meta for <%s>", qPrintable(d->path));
+ 
+@@ -491,14 +493,16 @@ void collectPluginMetaInformation(Plugin
+             foreach(QQmlError e, component.errors()) {
+                   qDebug("   line %d: %s", e.line(), qPrintable(e.description()));
+                   }
+-            return;
++            return false;
+             }
+       QmlPlugin* item = qobject_cast<QmlPlugin*>(obj);
++      const bool isQmlPlugin = bool(item);
+       if (item) {
+             d->version      = item->version();
+             d->description  = item->description();
+             }
+       delete obj;
++      return isQmlPlugin;
+       }
+ }
+ 
+--- a/mscore/plugin/pluginManager.cpp
++++ b/mscore/plugin/pluginManager.cpp
+@@ -167,8 +167,8 @@ static void updatePluginList(QList<QStri
+                               PluginDescription p;
+                               p.path = path;
+                               p.load = false;
+-                              collectPluginMetaInformation(&p);
+-                              pluginList.append(p);
++                              if (collectPluginMetaInformation(&p))
++                                    pluginList.append(p);
+                               }
+                         }
+                   }

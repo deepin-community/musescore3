@@ -1,0 +1,162 @@
+Origin: upstream, commit:754ddfd30733a426e0132f833e8a508fa26ab08d
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #291698: ensure consistent state of two-notes tremolo after file reading
+
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -2550,52 +2550,6 @@ void layoutDrumsetChord(Chord* c, const
+       }
+ 
+ //---------------------------------------------------------
+-//   connectTremolo
+-//    Connect two-notes tremolo and update duration types
+-//    for the involved chords.
+-//---------------------------------------------------------
+-
+-static void connectTremolo(Measure* m)
+-      {
+-      const int ntracks = m->score()->ntracks();
+-      constexpr SegmentType st = SegmentType::ChordRest;
+-      for (Segment* s = m->first(st); s; s = s->next(st)) {
+-            for (int i = 0; i < ntracks; ++i) {
+-                  Element* e = s->element(i);
+-                  if (!e || !e->isChord())
+-                        continue;
+-
+-                  Chord* c = toChord(e);
+-                  Tremolo* tremolo = c->tremolo();
+-                  if (tremolo && tremolo->twoNotes()) {
+-                        // Ensure correct duration type for chord
+-                        c->setDurationType(tremolo->durationType());
+-
+-                        // If it is the first tremolo's chord, find the second
+-                        // chord for tremolo, if needed.
+-                        if (!tremolo->chord1())
+-                              tremolo->setChords(c, tremolo->chord2());
+-                        else if (tremolo->chord1() != c || tremolo->chord2())
+-                              continue;
+-
+-                        for (Segment* ls = s->next(st); ls; ls = ls->next(st)) {
+-                              if (Element* element = ls->element(i)) {
+-                                    if (!element->isChord()) {
+-                                          qDebug("cannot connect tremolo");
+-                                          continue;
+-                                          }
+-                                    Chord* nc = toChord(element);
+-                                    tremolo->setChords(c, nc);
+-                                    nc->setTremolo(tremolo);
+-                                    break;
+-                                    }
+-                              }
+-                        }
+-                  }
+-            }
+-      }
+-
+-//---------------------------------------------------------
+ //   getNextMeasure
+ //---------------------------------------------------------
+ 
+@@ -2670,7 +2624,7 @@ void Score::getNextMeasure(LayoutContext
+             return;
+             }
+ 
+-      connectTremolo(measure);
++      measure->connectTremolo();
+ 
+       //
+       // calculate accidentals and note lines,
+--- a/libmscore/measure.cpp
++++ b/libmscore/measure.cpp
+@@ -2054,6 +2054,8 @@ void Measure::read(XmlReader& e, int sta
+             e.setTick(lm->tick() + lm->ticks());
+             }
+       e.setCurrentMeasure(nullptr);
++
++      connectTremolo();
+       }
+ 
+ //---------------------------------------------------------
+@@ -2523,6 +2525,52 @@ void Measure::scanElements(void* data, v
+             }
+       }
+ 
++//---------------------------------------------------------
++//   connectTremolo
++///   Connect two-notes tremolo and update duration types
++///   for the involved chords.
++//---------------------------------------------------------
++
++void Measure::connectTremolo()
++      {
++      const int ntracks = score()->ntracks();
++      constexpr SegmentType st = SegmentType::ChordRest;
++      for (Segment* s = first(st); s; s = s->next(st)) {
++            for (int i = 0; i < ntracks; ++i) {
++                  Element* e = s->element(i);
++                  if (!e || !e->isChord())
++                        continue;
++
++                  Chord* c = toChord(e);
++                  Tremolo* tremolo = c->tremolo();
++                  if (tremolo && tremolo->twoNotes()) {
++                        // Ensure correct duration type for chord
++                        c->setDurationType(tremolo->durationType());
++
++                        // If it is the first tremolo's chord, find the second
++                        // chord for tremolo, if needed.
++                        if (!tremolo->chord1())
++                              tremolo->setChords(c, tremolo->chord2());
++                        else if (tremolo->chord1() != c || tremolo->chord2())
++                              continue;
++
++                        for (Segment* ls = s->next(st); ls; ls = ls->next(st)) {
++                              if (Element* element = ls->element(i)) {
++                                    if (!element->isChord()) {
++                                          qDebug("cannot connect tremolo");
++                                          continue;
++                                          }
++                                    Chord* nc = toChord(element);
++                                    tremolo->setChords(c, nc);
++                                    nc->setTremolo(tremolo);
++                                    break;
++                                    }
++                              }
++                        }
++                  }
++            }
++      }
++
+ //---------------------------------------------------------
+ //   createVoice
+ //    Create a voice on demand by filling the measure
+--- a/libmscore/measure.h
++++ b/libmscore/measure.h
+@@ -194,6 +194,7 @@ class Measure final : public MeasureBase
+       Segment* undoGetSegment(SegmentType st, const Fraction& f)       { return undoGetSegmentR(st, f - tick()); }
+       Segment* getSegment(SegmentType st,     const Fraction& f)       { return getSegmentR(st, f - tick()); }
+ 
++      void connectTremolo();
+ 
+       qreal createEndBarLines(bool);
+       void barLinesSetSpan(Segment*);
+--- a/libmscore/read114.cpp
++++ b/libmscore/read114.cpp
+@@ -2171,6 +2171,7 @@ static void readMeasure(Measure* m, int
+                   }
+             }
+       e.checkTuplets();
++      m->connectTremolo();
+       }
+ 
+ //---------------------------------------------------------
+--- a/libmscore/read206.cpp
++++ b/libmscore/read206.cpp
+@@ -3360,6 +3360,7 @@ static void readMeasure(Measure* m, int
+                   e.unknown();
+             }
+       e.checkTuplets();
++      m->connectTremolo();
+       }
+ 
+ //---------------------------------------------------------

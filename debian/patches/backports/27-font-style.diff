@@ -1,0 +1,19 @@
+Origin: upstream, commit:146f6cf6398192aaab2888e2ee283d12922ae188
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #289908: cannot apply italic or underline to glissando text
+ The font style property is being converted from `FontStyle` to `bool`
+ instead of `int`, so bold, italic and underline are all the same.
+ .
+ This commit fixes that.
+
+--- a/libmscore/glissando.cpp
++++ b/libmscore/glissando.cpp
+@@ -649,7 +649,7 @@ bool Glissando::setProperty(Pid property
+                   setFontSize(v.toReal());
+                   break;
+             case Pid::FONT_STYLE:
+-                  setFontStyle(FontStyle(v.toBool()));
++                  setFontStyle(FontStyle(v.toInt()));
+                   break;
+             default:
+                   if (!SLine::setProperty(propertyId, v))

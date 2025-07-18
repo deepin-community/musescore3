@@ -1,0 +1,38 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: larry <gudrun>
+Description: Fix #274126 Crash when entering music on top of an unterminated slur by MIDI
+
+--- a/libmscore/noteentry.cpp
++++ b/libmscore/noteentry.cpp
+@@ -245,17 +245,19 @@ Note* Score::addPitch(NoteVal& nval, boo
+             if (e) {
+                   Fraction stick = Fraction(0, 1);
+                   Element* ee = _is.slur()->startElement();
+-                  if (ee->isChordRest())
+-                        stick = toChordRest(ee)->tick();
+-                  else if (ee->isNote())
+-                        stick = toNote(ee)->chord()->tick();
+-                  if (stick == e->tick()) {
+-                        _is.slur()->setTick(stick);
+-                        _is.slur()->setStartElement(e);
+-                        }
+-                  else {
+-                        _is.slur()->setTick2(e->tick());
+-                        _is.slur()->setEndElement(e);
++                  if (ee) {
++                        if (ee->isChordRest())
++                              stick = toChordRest(ee)->tick();
++                        else if (ee->isNote())
++                              stick = toNote(ee)->chord()->tick();
++                        if (stick == e->tick()) {
++                              _is.slur()->setTick(stick);
++                              _is.slur()->setStartElement(e);
++                              }
++                        else {
++                              _is.slur()->setTick2(e->tick());
++                              _is.slur()->setEndElement(e);
++                              }
+                         }
+                   }
+             else

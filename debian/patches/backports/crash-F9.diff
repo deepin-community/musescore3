@@ -1,0 +1,44 @@
+Origin: backport, commit:0c907ab8222859a645d9a2549da7d18ef11f8326
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #309333: crash hiding palettes
+ Resolves: https://musescore.org/en/node/309333
+ .
+ Crash happens on trying to set the focus upon closing the palette,
+ we try to restore the previous focused widget.
+ But it may no longer be valid.
+ .
+ Changed to return focus to the score view if possible,
+ otherwise let Qt worry about it.
+
+--- a/mscore/musescore.cpp
++++ b/mscore/musescore.cpp
+@@ -5791,17 +5791,14 @@ void MuseScore::cmd(QAction* a)
+             PaletteBox* pb = mscore->getPaletteBox();
+             QLineEdit* sb = pb->searchBox();
+             if (a->isChecked()) {
+-                  lastFocusWidget = QApplication::focusWidget();
+                   sb->setFocus();
+                   if (pb->noSelection())
+                         pb->setKeyboardNavigation(false);
+                   else
+                         pb->setKeyboardNavigation(true);
+                   }
+-            else {
+-                  if (lastFocusWidget)
+-                        lastFocusWidget->setFocus();
+-                  }
++            else if (cv)
++                  cv->setFocus();
+             return;
+             }
+       if (cmdn == "palette-search") {
+--- a/mscore/musescore.h
++++ b/mscore/musescore.h
+@@ -349,7 +349,6 @@ class MuseScore : public QMainWindow, pu
+       PaletteBox* paletteBox         { 0 };
+       Inspector* _inspector          { 0 };
+       OmrPanel* omrPanel             { 0 };
+-      QWidget* lastFocusWidget       { 0 };
+ 
+       QPushButton* showMidiImportButton {0};
+ 

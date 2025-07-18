@@ -1,0 +1,16 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #328337: Crash on deleting time signatures in front of multimeasure rests
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -524,6 +524,8 @@ bool Score::rewriteMeasures(Measure* fm,
+             //
+             // insert new calculated measures
+             //
++            if (!nfm || !nlm)
++                  continue;
+             nfm->setPrev(m1->prev());
+             nlm->setNext(m2->next());
+             s->undo(new InsertMeasures(nfm, nlm));

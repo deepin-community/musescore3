@@ -1,0 +1,38 @@
+Origin: upstream, commit:4253d779cf46b9a72e5b170b6f14dcc332c7d0d7
+Author: Eric Fontaine <eric@ericfontainejazz.com>
+Description: fix #291756 explicitly-signed char fluid pitchadj
+ C standards say that "char" may either be a "signed char" or "unsigned
+ char" but that it is up to the compilers implementation or the platform
+ which is followed. Some non x86 platforms, including PowerPC and ARM,
+ treat unspecified chars as unsigned chars, so it is necessary to
+ explicitly declare them as "signed char" (or to compile with
+ "--signed_chars").
+ .
+ This fix ensures that fluid synth's sample's pitchadj value are
+ correctly read as signed.
+
+--- a/fluid/sfont.cpp
++++ b/fluid/sfont.cpp
+@@ -831,9 +831,9 @@ unsigned char SFont::READB()
+ //   READC
+ //---------------------------------------------------------
+ 
+-char SFont::READC()
++signed char SFont::READC()
+       {
+-      char var;
++      signed char var;
+       safe_fread(&var, 1);
+       return var;
+       }
+--- a/fluid/sfont.h
++++ b/fluid/sfont.h
+@@ -93,7 +93,7 @@ class SFont {
+       void FSKIP(int size)    {  return safe_fseek(size); }
+       void FSKIPW();
+       unsigned char READB();
+-      char READC();
++      signed char READC();
+       void READSTR(char*);
+ 
+       void safe_fread(void *buf, int count);

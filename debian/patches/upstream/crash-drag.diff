@@ -1,0 +1,31 @@
+Origin: upstream, commit:484cd7e81e378f0fedf26ecd0a4d6cd5b77d3c61
+Author: MarcSabatella <marc@outsideshore.com>
+Description: fix #297152: crash on Ctrl+Shift+drag on Linux (under ChromeOS)
+ Resolves: https://musescore.org/en/node/297152
+ .
+ This might be unique to Linux apps on ChromeOS,
+ or it might apply to other Debian "stretch systems",
+ but apparently passing in a null or 1x1 pixmap to a QDrag
+ causes it to crash on exec().
+ This PR fixes the problem by making the pixmap 2x2.
+ It also allocates it statically to be sure there is no issue
+ with it coming off the stack.
+ I also replaced the deprecated QDrag::start() call with QDrag::exec(),
+ which we already do when dragging *from* the palette.
+ This is recommended as per Qt guidelines.
+
+--- a/mscore/scoreview.cpp
++++ b/mscore/scoreview.cpp
+@@ -3628,8 +3628,10 @@ void ScoreView::cloneElement(Element* e)
+             e = toSpannerSegment(e)->spanner();
+       mimeData->setData(mimeSymbolFormat, e->mimeData(QPointF()));
+       drag->setMimeData(mimeData);
+-      drag->setPixmap(QPixmap());
+-      drag->start(Qt::CopyAction);
++      static QPixmap pixmap = QPixmap(2, 2);    // null or 1x1 crashes on Linux under ChromeOS?!
++      pixmap.fill(Qt::white);
++      drag->setPixmap(pixmap);
++      drag->exec(Qt::CopyAction);
+       }
+ 
+ //---------------------------------------------------------

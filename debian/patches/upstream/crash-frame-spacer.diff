@@ -1,0 +1,16 @@
+Origin: upstream, commit:58c12c8623e8444af3b1449989213e0d40249408
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: fix #303611: Adding fixed spacer can clash
+ with vertical frame below, causing a crash.
+
+--- a/libmscore/system.cpp
++++ b/libmscore/system.cpp
+@@ -1091,7 +1091,7 @@ void System::scanElements(void* data, vo
+ qreal System::staffYpage(int staffIdx) const
+       {
+       if (_staves.size() <= staffIdx || staffIdx < 0) {
+-            qFatal("staffY: staves %d: bad staffIdx %d", _staves.size(), staffIdx);
++            qWarning("staffY: staves %d: bad staffIdx %d", _staves.size(), staffIdx);
+             return pagePos().y();
+             }
+       return _staves[staffIdx]->y() + y();

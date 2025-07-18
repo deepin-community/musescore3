@@ -1,0 +1,15 @@
+Origin: upstream, commit:01ba2c95007a77983050d47c4064fdb9bbd907da
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: fix #307900: Crash when switching voices if notes are tied
+
+--- a/libmscore/undo.cpp
++++ b/libmscore/undo.cpp
+@@ -2111,7 +2111,7 @@ void ChangeSpannerElements::flip(EditDat
+       Element*    oldEndElement     = spanner->endElement();
+       if (spanner->anchor() == Spanner::Anchor::NOTE) {
+             // be sure new spanner elements are of the right type
+-            if (!startElement->isNote() || !endElement->isNote())
++            if (!startElement || !startElement->isNote() || !endElement || !endElement->isNote())
+                   return;
+             Note* oldStartNote = toNote(oldStartElement);
+             Note* oldEndNote = toNote(oldEndElement);

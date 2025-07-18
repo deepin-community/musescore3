@@ -1,0 +1,26 @@
+Origin: upstream, commit:f84585f7d7e09601bc7ca7fa2de179e908d309a1
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #307929: corruption when inserting frame in front of nested frame
+ .
+ Resolves: https://musescore.org/en/node/307929
+ .
+ If you try to insert a frame in front of a horizontal frame
+ that itself is nested within a vertical frame,
+ the list of measurebases for the scores gets corrupted,
+ since the horizontal frame is not actually part of the list.
+ Solution here is to make sure we get the top level measurebase
+ that contains the current measurebase.
+ In most cases, it's the same thing,
+ but this will return the vertical frame in the case at hand.
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -2813,6 +2813,8 @@ void Score::insertMeasure(ElementType ty
+             MeasureBase* mb = toMeasureBase(Element::create(type, score));
+             mb->setTick(tick);
+ 
++            if (im)
++                  im = im->top(); // don't try to insert in front of nested frame
+             mb->setNext(im);
+             mb->setPrev(im ? im->prev() : score->last());
+             if (mb->isMeasure()) {

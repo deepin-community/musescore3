@@ -1,0 +1,139 @@
+Description: fix C++20 compatibility warnings by GCC 14
+ and some other warnings shown
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/libmscore/articulation.cpp
++++ b/libmscore/articulation.cpp
+@@ -522,6 +522,8 @@ Sid Articulation::getPropertyStyle(Pid i
+                               return Sid::articulationAnchorOther;
+                         }
+                   }
++                  Q_ASSERT(false); // should never be reached
++                  Q_FALLTHROUGH();
+             default:
+                   return Sid::NOSTYLE;
+             }
+--- a/mscore/exportxml.cpp
++++ b/mscore/exportxml.cpp
+@@ -4084,7 +4084,7 @@ static void repeatAtMeasureStart(XmlWrit
+                   case ElementType::MARKER:
+                         {
+                         // filter out the markers at measure Start
+-                        const Marker* const mk = static_cast<const Marker* const>(e);
++                        const Marker* const mk = static_cast<const Marker*>(e);
+                         Marker::Type mtp = mk->markerType();
+                         if (   mtp == Marker::Type::SEGNO
+                                || mtp == Marker::Type::CODA
+@@ -4127,7 +4127,7 @@ static void repeatAtMeasureStop(XmlWrite
+                   case ElementType::MARKER:
+                         {
+                         // filter out the markers at measure stop
+-                        const Marker* const mk = static_cast<const Marker* const>(e);
++                        const Marker* const mk = static_cast<const Marker*>(e);
+                         Marker::Type mtp = mk->markerType();
+                         if (mtp == Marker::Type::FINE || mtp == Marker::Type::TOCODA) {
+                               directionMarker(xml, mk);
+@@ -4141,7 +4141,7 @@ static void repeatAtMeasureStop(XmlWrite
+                         }
+                         break;
+                   case ElementType::JUMP:
+-                        directionJump(xml, static_cast<const Jump* const>(e));
++                        directionJump(xml, static_cast<const Jump*>(e));
+                         break;
+                   default:
+                         qDebug("repeatAtMeasureStop: direction type %s at tick %d not implemented",
+--- a/mscore/importgtp-gp6.cpp
++++ b/mscore/importgtp-gp6.cpp
+@@ -2498,11 +2498,11 @@ void GuitarPro6::readGpif(QByteArray* da
+                   if (c) {
+                         slur->setTick2(c->tick());
+                         score->addElement(slur);
+-                        legatos[slur->track()] = 0;
++                        legatos[slur->track()] = nullptr;
+                         }
+                   else {
++                        legatos[slur->track()] = nullptr;
+                         delete slur;
+-                        legatos[slur->track()] = 0;
+                         }
+                   }
+             }
+--- a/mscore/importmxmlpass2.cpp
++++ b/mscore/importmxmlpass2.cpp
+@@ -5349,7 +5349,7 @@ void MusicXMLParserNotations::slur()
+       Q_ASSERT(_e.isStartElement() && _e.name() == "slur");
+ 
+       Notation notation { _e.name().toString() };
+-      for (const auto attr : _e.attributes()) {
++      for (const auto& attr : _e.attributes()) {
+             notation.addAttribute(attr.name(), attr.value());
+             }
+       _notations.push_back(notation);
+@@ -5724,7 +5724,7 @@ void MusicXMLParserNotations::mordentNor
+       Q_ASSERT(_e.isStartElement() && (_e.name() == "mordent" || _e.name() == "inverted-mordent"));
+ 
+       Notation notation { _e.name().toString() };
+-      for (const auto attr : _e.attributes()) {
++      for (const auto& attr : _e.attributes()) {
+             notation.addAttribute(attr.name(), attr.value());
+             }
+       notation.setText(_e.readElementText());
+@@ -5747,7 +5747,7 @@ void MusicXMLParserNotations::glissandoS
+       Q_ASSERT(_e.isStartElement() && (_e.name() == "glissando" || _e.name() == "slide"));
+ 
+       Notation notation { _e.name().toString() };
+-      for (const auto attr : _e.attributes()) {
++      for (const auto& attr : _e.attributes()) {
+             notation.addAttribute(attr.name(), attr.value());
+             }
+       notation.setText(_e.readElementText());
+--- a/omr/omrview.cpp
++++ b/omr/omrview.cpp
+@@ -228,7 +228,7 @@ void OmrView::paintEvent(QPaintEvent* ev
+             for (const OmrSystem& system : page->systems()) {
+                   if (_showBarlines) {
+                         p.setPen(QPen(Qt::blue, 3.0));
+-                        for(const QLineF& l : system.barLines)
++                        for(const QLine& l : system.barLines)
+                             for(int w1 = 0; w1 < 10; w1++)
+                               p.drawLine(l.x1()+w1, l.y1(), l.x2()+w1, l.y2() ); //add width to barline
+                         }
+--- a/thirdparty/intervaltree/IntervalTree.h
++++ b/thirdparty/intervaltree/IntervalTree.h
+@@ -58,13 +58,13 @@ public:
+     intervalTree* right;
+     int center;
+ 
+-    IntervalTree<T,K>(void)
++    IntervalTree(void)
+         : left(NULL)
+         , right(NULL)
+         , center(0)
+     { }
+ 
+-    IntervalTree<T,K>(const intervalTree& other) {
++    IntervalTree(const intervalTree& other) {
+         center = other.center;
+         intervals = other.intervals;
+         if (other.left) {
+@@ -99,7 +99,7 @@ public:
+         return *this;
+     }
+ 
+-    IntervalTree<T,K>(
++    IntervalTree(
+             intervalVector& ivals,
+             unsigned int depth = 16,
+             unsigned int minbucket = 64,
+--- a/thirdparty/rtf2html/rtf2html.cpp
++++ b/thirdparty/rtf2html/rtf2html.cpp
+@@ -203,7 +203,7 @@ QString rtf2html(const QString& iString)
+                case rtf_keyword::rkw_fonttbl:
+                {
+                   font fnt;
+-                  int font_num;
++                  int font_num=-1;
+                   bool full_name=false;
+                   bool in_font=false;
+                   while (! (*buf_in=='}' && !in_font))

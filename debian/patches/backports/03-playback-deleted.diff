@@ -1,0 +1,40 @@
+Origin: upstream, commit:cc885c15ae9732fc576f92a382b2271edc649ee0
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #292851: Note still played after having been deleted.
+
+--- a/libmscore/chord.cpp
++++ b/libmscore/chord.cpp
+@@ -516,6 +516,7 @@ void Chord::add(Element* e)
+                   if (voice() && measure() && note->visible())
+                         measure()->setHasVoices(staffIdx(), true);
+                   }
++                  score()->setPlaylistDirty();
+                   break;
+             case ElementType::ARPEGGIO:
+                   _arpeggio = toArpeggio(e);
+@@ -597,6 +598,7 @@ void Chord::remove(Element* e)
+                         qDebug("Chord::remove() note %p not found!", e);
+                   if (voice() && measure() && note->visible())
+                         measure()->checkMultiVoices(staffIdx());
++                  score()->setPlaylistDirty();
+                   }
+                   break;
+ 
+--- a/libmscore/segment.cpp
++++ b/libmscore/segment.cpp
+@@ -584,6 +584,7 @@ void Segment::add(Element* el)
+ //                  ChordRest* cr = toChordRest(el);
+ //                  if (cr->tuplet() && !cr->tuplet()->elements().empty() && cr->tuplet()->elements().front() == cr && cr->tuplet()->tick() < 0)
+ //                        cr->tuplet()->setTick(cr->tick());
++                  score()->setPlaylistDirty();
+                   }
+                   // fall through
+ 
+@@ -639,6 +640,7 @@ void Segment::remove(Element* el)
+                         if (start != s->startElement() || end != s->endElement())
+                               score()->undo(new ChangeStartEndSpanner(s, start, end));
+                         }
++                  score()->setPlaylistDirty();
+                   }
+                   break;
+ 

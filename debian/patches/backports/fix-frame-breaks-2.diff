@@ -1,0 +1,47 @@
+Origin: upstream, commit:5edf0d5260a718a3dec56be7ab80046e48b55eb9
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #317747: measure number appears after section break
+ Resolves: https://musescore.org/en/node/317747#comment-1063687
+ .
+ In implementing a bunch of related fixes for the behavior of
+ section breaks followed by frames or breaks *on* frames*
+ in https://github.com/musescore/MuseScore/pull/7026/,
+ I introduced a new function designed to find relevant section breaks.
+ However, I missed one opportunity to use this function
+ (even though I left a TODO for this),
+ and in one place where I did call the function,
+ I neglected to actually use its return value.
+ As a result, in one situation where it previously worked
+ to place the section break on a frame
+ but failed when placing the frame after the section break,
+ my change merely reversed these two cases.
+ .
+ This commit fixes those two oversights.
+ In these two places where the code previously assumed
+ we had a MeasureBase that made sense to check for section breaks,
+ we now call findPotentialSectionBreak() to look backwards.
+ This ensures we don't miss breaks on or before frames
+ in these two places in the code.
+
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -3451,8 +3451,8 @@ System* Score::collectSystem(LayoutConte
+                               if (!s->enabled())
+                                     s->setEnabled(true);
+                               }
+-                        // TODO: use findPotentialSectionBreak here to handle breaks on frames correctly?
+-                        bool firstSystem = lc.prevMeasure->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
++                        const MeasureBase* pbmb = lc.prevMeasure->findPotentialSectionBreak();
++                        bool firstSystem = pbmb->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
+                         if (curHeader)
+                               m->addSystemHeader(firstSystem);
+                         else
+@@ -4462,7 +4462,7 @@ void Score::doLayoutRange(const Fraction
+             else {
+                   const MeasureBase* mb = lc.nextMeasure->prev();
+                   if (mb)
+-                        mb->findPotentialSectionBreak();
++                        mb = mb->findPotentialSectionBreak();
+                   LayoutBreak* sectionBreak = mb->sectionBreakElement();
+                   // TODO: also use mb in else clause here?
+                   // probably not, only actual measures have meaningful numbers

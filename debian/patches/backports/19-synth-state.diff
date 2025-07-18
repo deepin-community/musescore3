@@ -1,0 +1,28 @@
+Origin: upstream, commit:c9f84a4f5c1b959326276e88d480a550d2f10b67
+Author: James Thistlewood <jamesthistlewood@gmail.com>
+Description: fix #290323: synthesizer state duplicated when changing score with saved state
+
+--- a/libmscore/synthesizerstate.cpp
++++ b/libmscore/synthesizerstate.cpp
+@@ -42,6 +42,7 @@ void SynthesizerState::write(XmlWriter&
+ 
+ void SynthesizerState::read(XmlReader& e)
+       {
++      std::list<SynthesizerGroup> tempGroups;
+       while (e.readNextStartElement()) {
+             SynthesizerGroup group;
+             group.setName(e.name().toString());
+@@ -54,7 +55,12 @@ void SynthesizerState::read(XmlReader& e
+                   else
+                         e.unknown();
+                   }
+-            push_back(group);
++            tempGroups.push_back(group);
++            }
++
++      if (!tempGroups.empty()) {
++            // Replace any previously set state if we have read a new state
++            swap(tempGroups);
+             setIsDefault(false);
+             }
+       }

@@ -1,0 +1,43 @@
+Description: Exclude undesired AppData entries
+ plus stuff they missed… again…
+ plus asv-description-has-plaintext-url (Debian QA warning) fix
+Author: mirabilos <tg@debian.org>
+Forwarded: not-needed
+Justification: diff between upstream Flatpak metadata and our regular AppStream one
+
+--- a/build/Linux+BSD/org.musescore.MuseScore.appdata.xml.in
++++ b/build/Linux+BSD/org.musescore.MuseScore.appdata.xml.in
+@@ -36,10 +36,12 @@
+     <p>MuseScore includes a set of sounds that reproduce common instruments (as defined by General MIDI) without taking up a lot of disk space or memory, but you can also substitute any SoundFont you prefer for a wider variety of sounds or for more realism.</p>
+     <p>MuseScore can import and export MIDI and MusicXML files, and it can also import from Capella and several other programs. MuseScore can export to PDF, PNG, and other graphic formats, to WAV and other audio formats, or to Lilypond for an alternative layout and print option.</p>
+   </description>
++<!--
+   <kudos>
+     <kudo>ModernToolkit</kudo>
+     <kudo>UserDocs</kudo>
+   </kudos>
++-->
+   <project_license>GPL-2.0</project_license>
+   <metadata_license>CC0-1.0</metadata_license>
+   <url type="homepage">https://musescore.org</url>
+@@ -82,6 +84,11 @@
+     <content_attribute id="money-purchasing">mild</content_attribute>
+   </content_rating>
+   <releases>
++    <release date="2019-07-08" version="3.2.3">
++      <description>
++        <p>This release fixes some issues with tuplets and fingering layout, MDL Articulations, plugins, and Score_and_Parts PDFs on the Macintosh.</p>
++      </description>
++    </release>
+     <release date="2019-06-30" version="3.2.2">
+       <description>
+         <p>This release fixes some issues with plugins.</p>
+@@ -306,7 +313,7 @@
+         <ul>
+           <li>Fix #270496: Add missing elements to incomplete tuplets when reading from a file</li>
+           <li>Fix #272042: Saved preferences override command line options</li>
+-          <li>Debian fix: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=898757. Fix crash when starting with piano open.</li>
++          <li>Debian #898757: Fix crash when starting with piano open.</li>
+           <li>Allow path to be relative to stored album file</li>
+           <li>Fix #273660 : MIDI Keyboard Not Responded when Pressed Before Opening a Score</li>
+         </ul>

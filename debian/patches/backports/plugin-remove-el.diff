@@ -1,0 +1,146 @@
+Origin: backport, commit:19677e38768db0cd46832f30038d70012bc750a9
+Author: Dale Larson <dlarson42@gmail.com>
+Description: Fix #291790, fix #267604: Restore Chord.remove() and Chord.add() methods.
+ Restore the add and remove QML methods for the
+ Chord object. Adds exposed Element.parent property.
+ These existed in v2.x. Finally it adds a removeElement
+ method to PluginAPI for general element disposal.
+
+--- a/mscore/plugin/api/elements.cpp
++++ b/mscore/plugin/api/elements.cpp
+@@ -11,6 +11,7 @@
+ //=============================================================================
+ 
+ #include "elements.h"
++#include "score.h"
+ #include "libmscore/property.h"
+ 
+ namespace Ms {
+@@ -70,6 +71,50 @@ void Note::setTpc(int val)
+       }
+ 
+ //---------------------------------------------------------
++//   Chord::add
++//---------------------------------------------------------
++
++void Chord::add(Ms::PluginAPI::Element* wrapped)
++      {
++      Ms::Element* s = wrapped->element();
++      if (s)
++            {
++            // Ensure that the object has the expected ownership
++            if (wrapped->ownership() == Ownership::SCORE) {
++                  qWarning("Chord::add: Cannot add this element. The element is already part of the score.");
++                  return;        // Don't allow operation.
++                  }
++            // Score now owns the object.
++            wrapped->setOwnership(Ownership::SCORE);
++            // Provide parentage for element.
++            s->setParent(chord());
++            // If a note, ensure the element has proper Tpc values. (Will crash otherwise)
++            if (s->isNote()) {
++                  s->setTrack(chord()->track());
++                  toNote(s)->setTpcFromPitch();
++                  }
++            // Create undo op and add the element.
++            chord()->score()->undoAddElement(s);
++            }
++      }
++
++//---------------------------------------------------------
++//   Chord::remove
++//---------------------------------------------------------
++
++void Chord::remove(Ms::PluginAPI::Element* wrapped)
++      {
++      Ms::Element* s = wrapped->element();
++      if (s->parent() != chord())
++            qWarning("PluginAPI::Chord::remove: The element is not a child of this chord. Use removeElement() instead.");
++      else if (chord()->notes().size() <= 1 && s->type() == ElementType::NOTE)
++            qWarning("PluginAPI::Chord::remove: Removal of final note is not allowed.");
++      else if (s)
++            chord()->score()->deleteItem(s); // Create undo op and remove the element.
++      }
++
++
++//---------------------------------------------------------
+ //   wrap
+ ///   \cond PLUGIN_API \private \endcond
+ ///   Wraps Ms::Element choosing the correct wrapper type
+--- a/mscore/plugin/api/elements.h
++++ b/mscore/plugin/api/elements.h
+@@ -22,6 +22,7 @@
+ #include "libmscore/notedot.h"
+ #include "libmscore/segment.h"
+ #include "libmscore/accidental.h"
++#include "libmscore/types.h"
+ 
+ namespace Ms {
+ namespace PluginAPI {
+@@ -78,6 +79,11 @@ class Element : public Ms::PluginAPI::Sc
+        * \see Element::offset
+        */
+       Q_PROPERTY(qreal offsetY READ offsetY WRITE setOffsetY)
++      /**
++       * Parent element for this element.
++       * \since 3.3
++       */
++      Q_PROPERTY(Ms::PluginAPI::Element* parent READ parent)
+ 
+       API_PROPERTY( subtype,                 SUBTYPE                   )
+       API_PROPERTY_READ_ONLY_T( bool, selected, SELECTED               )
+@@ -316,6 +322,8 @@ class Element : public Ms::PluginAPI::Sc
+       void setOffsetX(qreal offX);
+       void setOffsetY(qreal offY);
+ 
++      Ms::PluginAPI::Element* parent() const { return wrap(element()->parent()); }
++
+    public:
+       /// \cond MS_INTERNAL
+       Element(Ms::Element* e = nullptr, Ownership own = Ownership::PLUGIN)
+@@ -449,6 +457,13 @@ class Chord : public Element {
+       //QQmlListProperty<Element> hook()         { return wrapContainerProperty<Element>(this, chord()->hook());      }
+       Ms::NoteType noteType()                  { return chord()->noteType(); }
+       /// \endcond
++
++      /// Add to a chord's elements.
++      /// \since MuseScore 3.3
++      Q_INVOKABLE void add(Ms::PluginAPI::Element* wrapped);
++      /// Remove a chord's element.
++      /// \since MuseScore 3.3
++      Q_INVOKABLE void remove(Ms::PluginAPI::Element* wrapped);
+       };
+ 
+ //---------------------------------------------------------
+--- a/mscore/plugin/api/qmlpluginapi.cpp
++++ b/mscore/plugin/api/qmlpluginapi.cpp
+@@ -178,6 +178,19 @@ Element* PluginAPI::newElement(int eleme
+       }
+ 
+ //---------------------------------------------------------
++//   removeElement
++///   Disposes of an Element and its children.
++///   \param Element type.
++///   \since MuseScore 3.3
++//---------------------------------------------------------
++
++void PluginAPI::removeElement(Ms::PluginAPI::Element* wrapped)
++      {
++      Ms::Score* score = wrapped->element()->score();
++      score->deleteItem(wrapped->element());
++      }
++
++//---------------------------------------------------------
+ //   newScore
+ //---------------------------------------------------------
+ 
+--- a/mscore/plugin/api/qmlpluginapi.h
++++ b/mscore/plugin/api/qmlpluginapi.h
+@@ -165,6 +165,7 @@ class PluginAPI : public Ms::QmlPlugin {
+ 
+       Q_INVOKABLE Ms::PluginAPI::Score* newScore(const QString& name, const QString& part, int measures);
+       Q_INVOKABLE Ms::PluginAPI::Element* newElement(int);
++      Q_INVOKABLE void removeElement(Ms::PluginAPI::Element* wrapped);
+       Q_INVOKABLE void cmd(const QString&);
+       /** \cond PLUGIN_API \private \endcond */
+       Q_INVOKABLE Ms::PluginAPI::MsProcess* newQProcess();

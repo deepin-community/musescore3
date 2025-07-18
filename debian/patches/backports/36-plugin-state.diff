@@ -1,0 +1,14 @@
+Origin: upstream, commit:7470a650db8335e50f5edb153255e10c9c31cca9
+Author: Sonny-Klotz <syk_778@hotmail.fr>
+Description: fix #291085 : cursor.addNote update internal segment reference
+
+--- a/mscore/plugin/api/cursor.cpp
++++ b/mscore/plugin/api/cursor.cpp
+@@ -218,6 +218,7 @@ void Cursor::addNote(int pitch)
+             setDuration(1, 4);
+       NoteVal nval(pitch);
+       _score->addPitch(nval, false);
++      _segment = _score->inputState().segment();
+       }
+ 
+ //---------------------------------------------------------

@@ -1,0 +1,53 @@
+Origin: upstream, commit:2c69a6dc1f302f4ca12903fc1788e7c96cbdaf13
+From: Matt McClinch <mattmcclinch@gmail.com>
+Description: Fix #305209: ticks_f warnings when loading a custom workspace
+ Resolves: https://musescore.org/en/node/305209
+ .
+ When reading in XML data, the _pasteMode flag of the XmlReader should
+ match the _clipboardmode flag of the XmlWriter that wrote the data. In
+ each of the four places that an XmlWriter is constructed in
+ mscore/workspace.cpp, the _clipboardmode flag of the XmlWriter is set
+ to true. For this reason, in each of the four places that an XmlReader
+ is constructed in mscore/workspace.cpp, the _pasteMode flag of the
+ XmlReader should be set to true to ensure that the data is interpreted
+ correctly.
+ .
+ For example, the XML for a Spanner object will include a "ticks_f" tag
+ if and only if the _clipboardmode flag of the XmlWriter is true. When
+ this XML is read back in, the XmlReader will not expect to find a
+ "ticks_f" tag if its _pasteMode flag is false.
+
+--- a/mscore/workspace.cpp
++++ b/mscore/workspace.cpp
+@@ -582,6 +582,7 @@ void Workspace::read()
+ 
+       QByteArray ba = f.fileData(rootfile);
+       XmlReader e(ba);
++      e.setPasteMode(true);
+ 
+       preferences.updateLocalPreferences();
+ 
+@@ -801,6 +802,7 @@ void Workspace::readGlobalMenuBar()
+ 
+       QByteArray ba (default_menubar.readAll());
+       XmlReader e(ba);
++      e.setPasteMode(true);
+ 
+       while (e.readNextStartElement()) {
+             if (e.name() == "museScore") {
+@@ -853,6 +855,7 @@ void Workspace::readGlobalToolBar()
+ 
+       QByteArray ba (default_toolbar.readAll());
+       XmlReader e(ba);
++      e.setPasteMode(true);
+ 
+       while (e.readNextStartElement()) {
+             if (e.name() == "museScore") {
+@@ -917,6 +920,7 @@ void Workspace::readGlobalGUIState()
+ 
+       QByteArray ba (default_toolbar.readAll());
+       XmlReader e(ba);
++      e.setPasteMode(true);
+ 
+       while (e.readNextStartElement()) {
+             if (e.name() == "museScore") {

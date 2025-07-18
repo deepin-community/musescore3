@@ -1,0 +1,19 @@
+Description: Allow offtime past nominal note length in PRE
+ (this already works when editing the MSCX XML manually)
+ .
+ Not applicable upstream since commit e6ec376a0728ada5833824
+ changed to a fraction-based measurement system.
+Author: mirabilos <m@mirbsd.org>
+Forwarded: not-applicable
+
+--- a/mscore/pianolevelsfilter.h
++++ b/mscore/pianolevelsfilter.h
+@@ -75,7 +75,7 @@ class PianoLevelFilterLen : public Piano
+ {
+ public:
+       QString name() override { return "Length"; }
+-      int maxRange() override { return 1000; }
++      int maxRange() override { return 9999; }
+       int minRange() override { return 0; }
+       int divisionGap() override { return 250; }
+       bool isPerEvent() override { return true; }

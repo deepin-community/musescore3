@@ -1,0 +1,28 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #324232: after a MIDI export without expanding repeats, those are not played in the current session anymore either
+
+--- a/libmscore/rendermidi.cpp
++++ b/libmscore/rendermidi.cpp
+@@ -2506,8 +2506,10 @@ void Score::renderMidi(EventMap* events,
+ 
+ void Score::renderMidi(EventMap* events, bool metronome, bool expandRepeats, const SynthesizerState& synthState)
+       {
++      bool expandRepeatsBackup = masterScore()->expandRepeats();
+       masterScore()->setExpandRepeats(expandRepeats);
+       MidiRenderer(this).renderScore(events, synthState, metronome);
++      masterScore()->setExpandRepeats(expandRepeatsBackup);
+       }
+ 
+ void MidiRenderer::renderScore(EventMap* events, const SynthesizerState& synthState, bool metronome)
+--- a/libmscore/score.h
++++ b/libmscore/score.h
+@@ -1263,6 +1263,7 @@ class MasterScore : public Score {
+       void setPlaylistClean()                                         { _playlistDirty = false; }
+ 
+       void setExpandRepeats(bool expandRepeats);
++      bool expandRepeats() const { return _expandRepeats; }
+       void updateRepeatListTempo();
+       virtual const RepeatList& repeatList() const override;
+ 

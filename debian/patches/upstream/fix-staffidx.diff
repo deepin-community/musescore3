@@ -1,0 +1,26 @@
+Origin: upstream, commit:1d56d5564bf3079055dbc8fcbd23469045c292b4
+Author: MarcSabatella <marc@outsideshore.com>
+Description: fix #281253: staff spacer down ignored on bottom of page
+ Resolves: https://musescore.org/en/node/281253
+ .
+ A staff spacer on the bottom system of a page does not work correctly:
+ we are looking foir a spacer on the *first* staff rather than the *last*.
+ So a spacer on the last staff is ignored, and one on the first is used
+ when it shouldn't be.
+ .
+ The code to calculate the amount of spacer required below the last
+ system of a page relies on System::lastVisibleSysStaff(),
+ which is return the correct SysStaff, but we are then attempting
+ to access the idx member, which has never been set up and is always 0.
+ Fix is to initialize idx when setting up the list of staves.
+
+--- a/libmscore/system.cpp
++++ b/libmscore/system.cpp
+@@ -162,6 +162,7 @@ Box* System::vbox() const
+ SysStaff* System::insertStaff(int idx)
+       {
+       SysStaff* staff = new SysStaff;
++      staff->idx = idx;
+       if (idx) {
+             // HACK: guess position
+             staff->bbox().setY(_staves[idx-1]->y() + 6 * spatium());

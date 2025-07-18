@@ -1,0 +1,116 @@
+Origin: upstream, commit:711b7ab72caa07318a7b086c4372e5a440ae2020
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #282165: Mute voice produces note that doesn't stop when overlap present
+
+--- a/mscore/exportmidi.cpp
++++ b/mscore/exportmidi.cpp
+@@ -293,6 +293,8 @@ bool ExportMidi::write(QIODevice* device
+                         for (auto i = events.begin(); i != events.end(); ++i) {
+                               const NPlayEvent& event = i->second;
+ 
++                              if (event.isMuted())
++                                    continue;
+                               if (event.discard() == staffIdx + 1 && event.velo() > 0)
+                                     // turn note off so we can restrike it in another track
+                                     track.insert(pauseMap.addPauseTicks(i->first), MidiEvent(ME_NOTEON, channel,
+--- a/mscore/seq.cpp
++++ b/mscore/seq.cpp
+@@ -515,16 +515,7 @@ void Seq::playEvent(const NPlayEvent& ev
+       {
+       int type = event.type();
+       if (type == ME_NOTEON) {
+-            bool mute = false;
+-
+-            const Note* note = event.note();
+-            if (note) {
+-                  Staff* staff      = note->staff();
+-                  Instrument* instr = staff->part()->instrument(note->chord()->tick());
+-                  const Channel* a = instr->playbackChannel(note->subchannel(), cs);
+-                  mute = a->mute() || a->soloMute() || !staff->playbackVoice(note->voice());
+-                  }
+-            if (!mute) {
++            if (!event.isMuted()) {
+                   if (event.discard()) { // ignore noteoff but restrike noteon
+                         if (event.velo() > 0)
+                               putEvent(NPlayEvent(ME_NOTEON, event.channel(), event.pitch(), 0) ,framePos);
+--- a/synthesizer/event.cpp
++++ b/synthesizer/event.cpp
+@@ -14,6 +14,9 @@
+ #include "libmscore/note.h"
+ #include "libmscore/sig.h"
+ #include "event.h"
++#include "libmscore/staff.h"
++#include "libmscore/instrument.h"
++#include "libmscore/part.h"
+ 
+ namespace Ms {
+ 
+@@ -164,6 +167,23 @@ NPlayEvent::NPlayEvent(BeatType beatType
+       }
+ 
+ //---------------------------------------------------------
++//   isMuted
++//---------------------------------------------------------
++
++bool NPlayEvent::isMuted() const
++      {
++      const Note* n = note();
++      if (n) {
++            MasterScore* cs = n->masterScore();
++            Staff* staff = n->staff();
++            Instrument* instr = staff->part()->instrument(n->tick());
++            const Channel* a = instr->playbackChannel(n->subchannel(), cs);
++            return a->mute() || a->soloMute() || !staff->playbackVoice(n->voice());
++            }
++      return false;
++      }
++
++//---------------------------------------------------------
+ //   dump
+ //---------------------------------------------------------
+ 
+@@ -391,25 +411,26 @@ void EventMap::fixupMIDI()
+ 
+       auto it = begin();
+       while (it != end()) {
++            NPlayEvent& event = it->second;
+             /* ME_NOTEOFF is never emitted, no need to check for it */
+-            if (it->second.type() == ME_NOTEON) {
+-                  unsigned short np = info[it->second.channel()].nowPlaying[it->second.pitch()];
+-                  if (it->second.velo() == 0) {
++            if (event.type() == ME_NOTEON && !event.isMuted()) {
++                  unsigned short np = info[event.channel()].nowPlaying[event.pitch()];
++                  if (event.velo() == 0) {
+                         /* already off (should not happen) or still playing? */
+                         if (np == 0 || --np > 0)
+-                              it->second.setDiscard(1);
++                              event.setDiscard(1);
+                         else {
+                               /* hoist NOTEOFF to same track as NOTEON */
+-                              it->second.setOriginatingStaff(info[it->second.channel()].event[it->second.pitch()]->getOriginatingStaff());
++                              event.setOriginatingStaff(info[event.channel()].event[event.pitch()]->getOriginatingStaff());
+                               }
+                         }
+                   else {
+                         if (++np > 1)
+                               /* restrike, possibly on different track */
+-                              it->second.setDiscard(info[it->second.channel()].event[it->second.pitch()]->getOriginatingStaff() + 1);
+-                        info[it->second.channel()].event[it->second.pitch()] = &(it->second);
++                              event.setDiscard(info[event.channel()].event[event.pitch()]->getOriginatingStaff() + 1);
++                        info[event.channel()].event[event.pitch()] = &event;
+                         }
+-                  info[it->second.channel()].nowPlaying[it->second.pitch()] = np;
++                  info[event.channel()].nowPlaying[event.pitch()] = np;
+                   }
+ 
+             ++it;
+--- a/synthesizer/event.h
++++ b/synthesizer/event.h
+@@ -254,6 +254,7 @@ class NPlayEvent : public PlayEvent {
+       void setOriginatingStaff(int i) { _origin = i; }
+       void setDiscard(int d) { _discard = d; }
+       int discard() const { return _discard; }
++      bool isMuted() const;
+       };
+ 
+ //---------------------------------------------------------

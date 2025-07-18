@@ -1,0 +1,131 @@
+Description: install a message handler for Qt
+ If the QT_MESSAGE_PATTERN envvar is set (i.e. the user has defined
+ their own log pattern), just skip loglevel debug messages unless
+ running in debug mode. Otherwise (default), format messages in the
+ Debian-præfixed style and with file/function/line number.
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/mscore/musescore.cpp
++++ b/mscore/musescore.cpp
+@@ -3825,6 +3825,104 @@ static void mscoreMessageHandler(QtMsgTy
+          abort();
+          }
+      }
++#else
++// helper
++static void
++mudeb_debmsgout(const void *s_)
++{
++	const unsigned char *s;
++	unsigned char c;
++
++	s = (const unsigned char *)s_;
++	if (!s || !*s) {
++		fputs("(nil)\n", stderr);
++		return;
++	}
++	do {
++		c = *s++;
++		putc(c, stderr);
++		if (c == '\n' && *s) {
++			putc('N', stderr);
++			putc(':', stderr);
++			putc(' ', stderr);
++		}
++	} while (*s);
++	if (c != '\n')
++		putc('\n', stderr);
++}
++
++// by default; Debian loglevel præficēs, file/func/line, silence debug unless enabled
++static void
++mudeb_debmsghandler(QtMsgType type, const QMessageLogContext &ctx, const QString &msg)
++{
++	QString s;
++	bool needsp;
++
++	switch (type) {
++	case QtDebugMsg:
++		if (!MScore::debugMode)
++			return;
++		putc('D', stderr);
++		break;
++	case QtWarningMsg:
++		putc('W', stderr);
++		break;
++	case QtCriticalMsg:
++	case QtFatalMsg:
++		putc('E', stderr);
++		break;
++	default:
++		putc('I', stderr);
++	}
++	putc(':', stderr);
++	if (ctx.category && strcmp(ctx.category, "default") != 0) {
++		putc(' ', stderr);
++		putc('<', stderr);
++		fputs(ctx.category, stderr);
++		putc('>', stderr);
++	}
++	needsp = true;
++	if (ctx.file) {
++		if (needsp) {
++			putc(' ', stderr);
++			needsp = false;
++		}
++		fputs(ctx.file, stderr);
++	}
++	if (ctx.function) {
++		if (needsp) {
++			putc(' ', stderr);
++			needsp = false;
++		}
++		putc('{', stderr);
++		fputs(ctx.function, stderr);
++		putc('}', stderr);
++	}
++	if (ctx.line && (ctx.file || ctx.function))
++		fprintf(stderr, ":%d", ctx.line);
++	if (!needsp)
++		putc(':', stderr);
++	putc(' ', stderr);
++	mudeb_debmsgout(qPrintable(msg));
++	fflush(stderr);
++}
++
++#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
++// if QT_MESSAGE_PATTERN is set: silence debug unless enabled
++static void
++mudeb_qtmsghandler(QtMsgType type, const QMessageLogContext &ctx, const QString &msg)
++{
++	if (type == QtDebugMsg && !MScore::debugMode)
++		return;
++
++	QString s = qFormatLogMessage(type, ctx, msg);
++	if (s.isNull())
++		return;
++	fputs(qPrintable(s), stderr);
++	putc('\n', stderr);
++	fflush(stderr);
++}
++#endif
+ #endif
+ 
+ //---------------------------------------------------------
+@@ -7182,8 +7280,14 @@ int main(int argc, char* av[])
+       QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+ #if defined(QT_DEBUG) && defined(Q_OS_WIN)
+       MScore::msgHandler = mscoreMessageHandler;
+-      qInstallMessageHandler(mscoreMessageHandler);
++#else
++      MScore::msgHandler = mudeb_debmsghandler;
++#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
++      if (getenv("QT_MESSAGE_PATTERN") != NULL)
++            MScore::msgHandler = mudeb_qtmsghandler;
++#endif
+ #endif
++      qInstallMessageHandler(MScore::msgHandler);
+ 
+       qRegisterMetaTypeStreamOperators<SessionStart>("SessionStart");
+       qRegisterMetaTypeStreamOperators<MusicxmlExportBreaks>("MusicxmlExportBreaks");

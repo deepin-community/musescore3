@@ -1,0 +1,19 @@
+Origin: upstream, commit:3fa9fe4c950f59478753724f3df3b1821b97e475
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #290047: require Shift to adjust segment with cursor keys in edit mode
+
+--- a/libmscore/note.cpp
++++ b/libmscore/note.cpp
+@@ -2367,7 +2367,11 @@ void Note::editDrag(EditData& ed)
+       {
+       Chord* ch = chord();
+       Segment* seg = ch->segment();
+-      if (seg) {
++      // adjust segment on plain drag or Shift+cursor,
++      // adjust note/chord for Ctrl+drag or plain cursor
++      if (seg &&
++          (((ed.buttons & Qt::LeftButton) && !(ed.modifiers & Qt::ControlModifier))
++           || (ed.modifiers & Qt::ShiftModifier))) {
+             const Spatium deltaSp = Spatium(ed.delta.x() / spatium());
+             seg->undoChangeProperty(Pid::LEADING_SPACE, seg->extraLeadingSpace() + deltaSp);
+             }

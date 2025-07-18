@@ -1,0 +1,73 @@
+Origin: upstream, commit:ef1a4c97347884baa7b85fa34afd0b14b2a0b883
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #307841: crashes and more with hbox within vbox
+ .
+ Resolves: https://musescore.org/en/node/307841
+ .
+ When adding an hbox within a vbox,
+ we never set its tick,
+ and as a result other operations that depend on the tick
+ (like triggering layout) do not work correctly.
+ This is fixed by overriding HBox::tick() to check the parent.
+ It was also necessary to alter MeasureBase::triggerLayout(),
+ as it actually did nothing for hbox-within-vbox,
+ because it checks for prev() and next() which are nullptr here.
+ That check is needed to avoid triggering layout for measurebases
+ that are not yet added to the score.
+ This problem is solved here by checking the parent,
+ just as is done for the tick itself.
+
+--- a/libmscore/measurebase.cpp
++++ b/libmscore/measurebase.cpp
+@@ -302,6 +302,32 @@ void MeasureBase::layout()
+       }
+ 
+ //---------------------------------------------------------
++//   top
++//---------------------------------------------------------
++
++MeasureBase* MeasureBase::top() const
++      {
++      const MeasureBase* mb = this;
++      while (mb->parent()) {
++            if (mb->parent()->isMeasureBase())
++                  mb = toMeasureBase(mb->parent());
++            else
++                  break;
++            }
++      return const_cast<MeasureBase*>(mb);
++      }
++
++//---------------------------------------------------------
++//   tick
++//---------------------------------------------------------
++
++Fraction MeasureBase::tick() const
++      {
++      const MeasureBase* mb = top();
++      return mb ? mb->_tick : Fraction(-1, 1);
++      }
++
++//---------------------------------------------------------
+ //   first
+ //---------------------------------------------------------
+ 
+--- a/libmscore/measurebase.h
++++ b/libmscore/measurebase.h
+@@ -87,6 +87,7 @@ class MeasureBase : public Element {
+       void setNext(MeasureBase* e)           { _next = e;      }
+       MeasureBase* prev() const              { return _prev;   }
+       void setPrev(MeasureBase* e)           { _prev = e;      }
++      MeasureBase *top() const;
+ 
+       Ms::Measure* nextMeasure() const;
+       Ms::Measure* prevMeasure() const;
+@@ -119,7 +120,7 @@ class MeasureBase : public Element {
+       virtual void writeProperties(XmlWriter&) const override;
+       virtual bool readProperties(XmlReader&) override;
+ 
+-      Fraction tick() const                { return _tick; }
++      Fraction tick() const override;
+       void setTick(const Fraction& f)      { _tick = f;    }
+ 
+       Fraction ticks() const               { return _len;         }

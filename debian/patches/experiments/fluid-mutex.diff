@@ -1,0 +1,86 @@
+Description: avoid UB (destroying a locked mutex)
+ Unlock it just before end of holder’s destructor; ensure all
+ callers won’t use it again.
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/fluid/fluid.cpp
++++ b/fluid/fluid.cpp
+@@ -121,6 +121,7 @@ Fluid::~Fluid()
+       qDeleteAll(sfonts);
+       qDeleteAll(channel);
+       qDeleteAll(patches);
++      mutex.unlock();
+       }
+ 
+ //---------------------------------------------------------
+@@ -406,6 +407,8 @@ void Fluid::update_presets()
+ 
+ void Fluid::process(unsigned len, float* out, float* effect1, float* effect2)
+       {
++      if (_globalTerminate)
++            return;
+       if (mutex.tryLock()) {
+             //we have to copy voices array for proper output sound processing in for loop
+             auto tempVoices = activeVoices;
+@@ -641,6 +644,8 @@ bool Fluid::loadSoundFonts(const QString
+             qDebug("Fluid:loadSoundFonts: already loaded");
+             return true;
+             }
++      if (_globalTerminate)
++            return false;
+       QMutexLocker locker(&mutex);
+       for(Voice* v : activeVoices)
+             v->off();
+@@ -688,6 +693,8 @@ bool Fluid::loadSoundFonts(const QString
+ 
+ bool Fluid::addSoundFont(const QString& s)
+       {
++      if (_globalTerminate)
++            return false;
+       QMutexLocker locker(&mutex);
+       bool rv = (sfload(s) == -1) ? false : true;
+       return rv;
+@@ -700,6 +707,8 @@ bool Fluid::addSoundFont(const QString&
+ 
+ bool Fluid::removeSoundFont(const QString& s)
+       {
++      if (_globalTerminate)
++            return false;
+       QMutexLocker locker(&mutex);
+       for(Voice* v : activeVoices)
+             v->off();
+--- a/fluid/fluid.h
++++ b/fluid/fluid.h
+@@ -418,7 +418,6 @@ class Fluid : public Synthesizer {
+       static QFileInfoList sfFiles();
+ 
+       bool globalTerminate() { return _globalTerminate; }
+-      void setGlobalTerminate(bool terminate = true) { _globalTerminate = terminate; }
+ 
+       friend class Voice;
+       friend class Preset;
+--- a/fluid/sfont.cpp
++++ b/fluid/sfont.cpp
+@@ -146,6 +146,12 @@ void Preset::loadSamples()
+       {
+       bool locked = sfont->synth->mutex.tryLock();
+ 
++      if (sfont->synth->globalTerminate()) {
++            if (locked)
++                  sfont->synth->mutex.unlock();
++            return;
++            }
++
+       if (_global_zone && _global_zone->instrument) {
+             Instrument* i = _global_zone->instrument;
+             if (i->global_zone && i->global_zone->sample)
+@@ -168,7 +174,7 @@ void Preset::loadSamples()
+                         if (locked)
+                               sfont->synth->mutex.unlock();
+                         return;
+-                  }
++                        }
+ 
+                   iz->sample->load();
+                   }

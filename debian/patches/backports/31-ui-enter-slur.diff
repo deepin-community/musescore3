@@ -1,0 +1,33 @@
+Origin: upstream, commit:d173093c407e96dbebb0b8684f7c0fa5c38e6904
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #166116: Slurs terminate in wrong spot in voices other than 1
+
+--- a/libmscore/cmd.cpp
++++ b/libmscore/cmd.cpp
+@@ -711,6 +711,11 @@ Segment* Score::setNoteRest(Segment* seg
+             connectTies();
+       if (nr) {
+             if (_is.slur() && nr->type() == ElementType::NOTE) {
++                  // If the start element was the same as the end element when the slur was created,
++                  // the end grip of the front slur segment was given an x-offset of 3.0 * spatium().
++                  // Now that the slur is about to be given a new end element, this should be reset.
++                  if (_is.slur()->endElement() == _is.slur()->startElement())
++                        _is.slur()->frontSegment()->reset();
+                   //
+                   // extend slur
+                   //
+--- a/mscore/scoreview.cpp
++++ b/mscore/scoreview.cpp
+@@ -3335,8 +3335,11 @@ void ScoreView::addSlur()
+       InputState& is = _score->inputState();
+       if (noteEntryMode() && is.slur()) {
+             const std::vector<SpannerSegment*>& el = is.slur()->spannerSegments();
+-            if (!el.empty())
++            if (!el.empty()) {
+                   el.front()->setSelected(false);
++                  // Now make sure that the slur segment is redrawn so that it does not *look* selected
++                  update();
++                  }
+             is.setSlur(nullptr);
+             return;
+             }
