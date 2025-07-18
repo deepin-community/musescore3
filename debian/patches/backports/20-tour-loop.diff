@@ -1,0 +1,24 @@
+Origin: upstream, commit:936a74322288f31c7c7281ae8dbf5df5a2d880e4
+Author: Eric Fontaine <eric@ericfontainejazz.com>
+Description: fix #291646 initiate inspector tour on mouse press
+ Fixes bug that caused inability to finish the inspector tour if user
+ undocked and dragged the inspector widget before tour was initiated. If
+ the inspector was undocked, then it would interfere with clicking
+ "Next" or "Close" in the tour's popup mbox.
+ .
+ This solution is to start the tour on MouseButtonPress so the tour
+ happens before the main mscore window loses mouse focus.
+
+--- a/share/tours/inspector.tour
++++ b/share/tours/inspector.tour
+@@ -1,8 +1,8 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <Tour name="inspector-tour">
+-  <Event objectName="inspector">MouseButtonRelease</Event>
++  <Event objectName="inspector">MouseButtonPress</Event>
+   <Event objectName="inspector">FocusIn</Event>
+-  <Event objectName="InspectorBase">MouseButtonRelease</Event>
++  <Event objectName="InspectorBase">MouseButtonPress</Event>
+   <Event objectName="InspectorBase">FocusIn</Event>
+   <Message>
+     <Text>Welcome to the Inspector, where you can change individual properties for selected elements.

@@ -1,0 +1,29 @@
+Origin: upstream, commit:30e1ea9674e64511523cf09c35f1c8a45fc92add
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #295357: lyrics Y offset in parts lost on save/reload
+ .
+ In 3.0 - 3.0.5, it was not possible to change the Y position of lyrics.
+ You could try, and an offset would be recorded, but it would have no effect on layout.
+ Starting with 3.1, it became possible to change the Y position for lyrics.
+ For compatibility, we cleared the Y offset when reading  3.0 - 3.0.5 scores,
+ since it would have been ignored originally.
+ However, the code doing the version check fails in parts,
+ because mscoreVersion() returns an empty string in that case.
+ This change simply amends the check to use masterScore() rather than score(),
+ so parts no longer return an empty version,
+ and also adds an explicit check for the version being empty,
+ so the check works correctly in test mode,
+ where this field is often empty even for the master score.
+
+--- a/libmscore/lyrics.cpp
++++ b/libmscore/lyrics.cpp
+@@ -113,7 +113,8 @@ void Lyrics::read(XmlReader& e)
+       if (!isStyled(Pid::OFFSET) && !e.pasteMode()) {
+             // fix offset for pre-3.1 scores
+             // 3.0: y offset was meaningless if autoplace is set
+-            if (autoplace() && score()->mscoreVersion() < "3.1") {
++            QString version = masterScore()->mscoreVersion();
++            if (autoplace() && !version.isEmpty() && version < "3.1") {
+                   QPointF off = propertyDefault(Pid::OFFSET).toPointF();
+                   ryoffset() = off.y();
+                   }

@@ -1,0 +1,16 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #321074: Pitch bend sounds incorrectly when export to MIDI
+
+--- a/mscore/preferences.cpp
++++ b/mscore/preferences.cpp
+@@ -123,7 +123,7 @@ void Preferences::init(bool storeInMemor
+             {PREF_IO_MIDI_ADVANCEONRELEASE,                        new BoolPreference(true, false)},
+             {PREF_IO_MIDI_ENABLEINPUT,                             new BoolPreference(true, false)},
+             {PREF_IO_MIDI_EXPANDREPEATS,                           new BoolPreference(true, false)},
+-            {PREF_IO_MIDI_EXPORTRPNS,                              new BoolPreference(false, false)},
++            {PREF_IO_MIDI_EXPORTRPNS,                              new BoolPreference(true, false)},
+             {PREF_IO_MIDI_REALTIMEDELAY,                           new IntPreference(750 /* ms */, false)},
+             {PREF_IO_MIDI_SHORTESTNOTE,                            new IntPreference(MScore::division/4, false)},
+             {PREF_IO_MIDI_SHOWCONTROLSINMIXER,                     new BoolPreference(false, false)},

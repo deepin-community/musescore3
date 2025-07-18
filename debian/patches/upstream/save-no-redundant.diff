@@ -1,0 +1,19 @@
+Origin: upstream, commit:d83b768f87a9d05a8b33a5b80e7043922ab7c337
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #301116: don't write default note event values along with non-default ones
+
+--- a/libmscore/noteevent.cpp
++++ b/libmscore/noteevent.cpp
+@@ -41,9 +41,9 @@ void NoteEvent::read(XmlReader& e)
+ void NoteEvent::write(XmlWriter& xml) const
+       {
+       xml.stag("Event");
+-      xml.tag("pitch", _pitch);
+-      xml.tag("ontime", _ontime);
+-      xml.tag("len", _len);
++      xml.tag("pitch", _pitch, 0);
++      xml.tag("ontime", _ontime, 0);
++      xml.tag("len", _len, NOTE_LENGTH);
+       xml.etag();
+       }
+ 

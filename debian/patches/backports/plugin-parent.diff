@@ -1,0 +1,27 @@
+Origin: upstream, commit:f1369d3a5ae1beca7a01fd06719ffe93f39cfb47
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: Plugins: fix a crash on getting element's parent if parent is null
+
+--- a/mscore/plugin/api/elements.cpp
++++ b/mscore/plugin/api/elements.cpp
+@@ -123,6 +123,9 @@ void Chord::remove(Ms::PluginAPI::Elemen
+ 
+ Element* wrap(Ms::Element* e, Ownership own)
+       {
++      if (!e)
++            return nullptr;
++
+       using Ms::ElementType;
+       switch(e->type()) {
+             case ElementType::NOTE:
+--- a/mscore/plugin/api/scoreelement.cpp
++++ b/mscore/plugin/api/scoreelement.cpp
+@@ -105,6 +105,8 @@ void ScoreElement::set(Ms::Pid pid, QVar
+ 
+ ScoreElement* wrap(Ms::ScoreElement* se, Ownership own)
+       {
++      if (!se)
++            return nullptr;
+       if (se->isElement())
+             return wrap(toElement(se), own);
+ 

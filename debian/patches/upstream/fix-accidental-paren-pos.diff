@@ -1,0 +1,38 @@
+Description: honour symbol advance width from font when drawing accidentals
+ more specifically, accidentals in parenthesēs (or other enclosing
+ symbols) now have the advance width of the enclosing glyph and the
+ glyph from the accidental itself honoured fixing asymmetric render
+ of a parenthesised ♭
+Author: mirabilos <m@mirbsd.org>
+Forwarded: https://github.com/musescore/MuseScore/pull/6759
+Applied-Upstream: v3.6, commit:1d81510cdaa67d8787067c0774674bcbaedbb11c
+
+--- a/libmscore/accidental.cpp
++++ b/libmscore/accidental.cpp
+@@ -284,23 +284,24 @@ void Accidental::layout()
+       setMag(m);
+ 
+       m = magS();
++      qreal x = 0;
+ 
+       if (_bracket != AccidentalBracket::NONE) {
+             SymId id = _bracket == AccidentalBracket::PARENTHESIS ? SymId::accidentalParensLeft : SymId::accidentalBracketLeft;
+             SymElement e(id, 0.0);
+             el.append(e);
+             r |= symBbox(id);
++            x += symAdvance(id);
+             }
+ 
+       SymId s = symbol();
+-      qreal x = r.x()+r.width();
+       SymElement e(s, x);
+       el.append(e);
+       r |= symBbox(s).translated(x, 0.0);
+ 
+       if (_bracket != AccidentalBracket::NONE) {
++            x += symAdvance(s);
+             SymId id = _bracket == AccidentalBracket::PARENTHESIS ? SymId::accidentalParensRight : SymId::accidentalBracketRight;
+-            x = r.x()+r.width();
+             SymElement e1(id, x);
+             el.append(e1);
+             r |= symBbox(id).translated(x, 0.0);

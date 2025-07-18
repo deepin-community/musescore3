@@ -1,0 +1,16 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #332925: Half duration shortcut crashes musescore when time signature is 5/4
+
+--- a/libmscore/cmd.cpp
++++ b/libmscore/cmd.cpp
+@@ -2395,7 +2395,7 @@ void Score::cmdIncDecDuration(int nSteps
+ 
+       // if measure rest is selected as input, then the correct initialDuration will be the
+       // duration of the measure's time signature, else is just the input state's duration
+-      TDuration initialDuration = (cr->durationType() == TDuration::DurationType::V_MEASURE) ? TDuration(cr->measure()->timesig()) : _is.duration();
++      TDuration initialDuration = (cr->durationType() == TDuration::DurationType::V_MEASURE) ? TDuration(cr->measure()->timesig(), true) : _is.duration();
+       TDuration d = initialDuration.shiftRetainDots(nSteps, stepDotted);
+       if (!d.isValid())
+             return;

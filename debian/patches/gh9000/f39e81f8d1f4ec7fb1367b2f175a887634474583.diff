@@ -1,0 +1,45 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Daniel Rebelsky <4641927+drebelsky@users.noreply.github.com>
+Description: Fix #310158: Don't null terminate MIDI text meta events
+
+--- a/midi/midifile.cpp
++++ b/midi/midifile.cpp
+@@ -129,8 +129,15 @@ void MidiFile::writeEvent(const MidiEven
+             case ME_META:
+                   put(ME_META);
+                   put(event.metaType());
+-                  putvl(event.len());
+-                  write(event.edata(), event.len());
++                  // Don't null terminate text meta events
++                  if (event.metaType() >= 0x1 && event.metaType() <= 0x14) {
++                        putvl(event.len() - 1);
++                        write(event.edata(), event.len() - 1);
++                        }
++                  else {
++                        putvl(event.len());
++                        write(event.edata(), event.len());
++                        }
+                   resetRunningStatus();     // really ?!
+                   break;
+ 
+--- a/miditools/midifile.cpp
++++ b/miditools/midifile.cpp
+@@ -405,8 +405,15 @@ void MidiFile::writeEvent(const MidiEven
+             case MidieEventType::META:
+                   put(MidiEventType::META);
+                   put(event.metaType());
+-                  putvl(event.len());
+-                  write(event.edata(), event.len());
++                  // Don't null terminate text meta events
++                  if (event.metaType() >= 0x1 && event.metaType() <= 0x14) {
++                        putvl(event.len() - 1);
++                        write(event.edata(), event.len() - 1);
++                        }
++                  else {
++                        putvl(event.len());
++                        write(event.edata(), event.len());
++                        }
+                   resetRunningStatus();     // really ?!
+                   break;
+ 

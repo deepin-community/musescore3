@@ -1,0 +1,34 @@
+Origin: upstream, commit:cdd80e419dddb37a39c18ae52827189e8b6b7430
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #284344: ambitus not redrawn on Update Range
+
+--- a/mscore/inspector/inspectorAmbitus.cpp
++++ b/mscore/inspector/inspectorAmbitus.cpp
+@@ -133,18 +133,23 @@ void InspectorAmbitus::valueChanged(int
+             }
+       }
+ 
+-}
+-
+ //---------------------------------------------------------
+-//   on updateRange clicked
++//   updateRange
++//    Automatically adjust range based on the score
+ //---------------------------------------------------------
+ 
+ void Ms::InspectorAmbitus::updateRange()
+ {
+       Ambitus* range = toAmbitus(inspector->element());
+       range->updateRange();
+-      range->layout();              // redo layout
++
++      range->score()->startCmd();
++      range->triggerLayout();
++      range->score()->endCmd();
++
+       setElement();                 // set Inspector values to range properties
+       valueChanged(AmbitusControl::TOPTPC);         // force score to notice new range properties
++      }
++
+ }
+ 

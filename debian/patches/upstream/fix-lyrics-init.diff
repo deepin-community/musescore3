@@ -1,0 +1,20 @@
+Origin: upstream, commit:0a24d95a85c4f771103472a58a6e5596239f85d8
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: Fix initialization of LyricsLineSegment members
+ .
+ Fixes random hanging on PNG export of some scores, see
+ https://musescore.org/en/node/293523#comment-940874
+
+--- a/libmscore/lyrics.h
++++ b/libmscore/lyrics.h
+@@ -139,8 +139,8 @@ class LyricsLine final : public SLine {
+ 
+ class LyricsLineSegment final : public LineSegment {
+    protected:
+-      int   _numOfDashes;
+-      qreal _dashLength;
++      int   _numOfDashes = 0;
++      qreal _dashLength = 0;
+ 
+    public:
+       LyricsLineSegment(Spanner*, Score*);

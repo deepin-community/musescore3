@@ -1,0 +1,53 @@
+Origin: upstream, commit:306cf054b2da5463aa9c83f1b14673d9728b3596
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #299768: Hairpin: when copied, all custom settings are lost and the element resets to default
+ Resolves: https://musescore.org/en/node/299768.
+
+--- a/libmscore/chordrest.cpp
++++ b/libmscore/chordrest.cpp
+@@ -616,16 +616,13 @@ Element* ChordRest::drop(EditData& data)
+ 
+             case ElementType::HAIRPIN:
+                   {
+-                  const Hairpin* hairpin = toHairpin(e);
+-                  ChordRest* endCR = this;
+-                  if (hairpin->ticks().isNotZero()) {
+-                        const Fraction tick2 = tick() + hairpin->ticks() - Fraction::eps();
+-                        endCR = score()->findCR(tick2, track());
+-                        }
+-                  score()->addHairpin(hairpin->hairpinType(), this, endCR);
+-                  delete e;
++                  Hairpin* hairpin = toHairpin(e);
++                  hairpin->setTick(tick());
++                  hairpin->setTrack(track());
++                  hairpin->setTrack2(track());
++                  score()->undoAddElement(hairpin);
+                   }
+-                  return nullptr;
++                  return e;
+ 
+             default:
+                   qDebug("cannot drop %s", e->name());
+--- a/libmscore/paste.cpp
++++ b/libmscore/paste.cpp
+@@ -790,13 +790,13 @@ void Score::pasteSymbols(XmlReader& e, C
+                               undoAddElement(d);
+                               }
+                         else if (tag == "HairPin") {
+-                              Hairpin h(this);
+-                              h.setTrack(destTrack);
+-                              h.read(e);
+-                              h.setTrack(destTrack);
+-                              ChordRest* destCR1 = findCR(destTick, destTrack);
+-                              ChordRest* destCR2 = findCR(destTick + h.ticks() - Fraction::eps(), destTrack);
+-                              addHairpin(h.hairpinType(), destCR1, destCR2);
++                              Hairpin* h = new Hairpin(this);
++                              h->setTrack(destTrack);
++                              h->read(e);
++                              h->setTrack(destTrack);
++                              h->setTrack2(destTrack);
++                              h->setTick(destTick);
++                              undoAddElement(h);
+                               }
+                         else {
+                               //

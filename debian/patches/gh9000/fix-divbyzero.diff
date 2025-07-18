@@ -1,0 +1,16 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: part of a bugfix that’s generally useful
+
+--- a/libmscore/fraction.h
++++ b/libmscore/fraction.h
+@@ -227,7 +227,7 @@ class Fraction {
+ 
+       int ticks() const
+             {
+-            if (_numerator == -1 && _denominator == 1)        // HACK
++            if ((_numerator == -1 && _denominator == 1) || _denominator == 0)        // HACK
+                   return -1;
+ 
+             // MScore::division     - ticks per quarter note

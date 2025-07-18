@@ -1,0 +1,47 @@
+Description: keep a set QtMessageHandler across Plugin Creator runs
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/libmscore/mscore.cpp
++++ b/libmscore/mscore.cpp
+@@ -59,6 +59,8 @@
+ 
+ namespace Ms {
+ 
++QtMessageHandler MScore::msgHandler = 0;
++
+ bool MScore::debugMode = false;
+ bool MScore::testMode = false;
+ 
+--- a/libmscore/mscore.h
++++ b/libmscore/mscore.h
+@@ -375,6 +375,8 @@ class MScore {
+ 
+       static MPaintDevice* paintDevice();
+ 
++      static QtMessageHandler msgHandler;
++
+       static void setError(MsError e) { _error = e; }
+       static const char* errorMessage();
+       static const char* errorGroup();
+--- a/mscore/musescore.cpp
++++ b/mscore/musescore.cpp
+@@ -7181,6 +7181,7 @@ int main(int argc, char* av[])
+       QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+       QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+ #if defined(QT_DEBUG) && defined(Q_OS_WIN)
++      MScore::msgHandler = mscoreMessageHandler;
+       qInstallMessageHandler(mscoreMessageHandler);
+ #endif
+ 
+--- a/mscore/plugin/pluginCreator.cpp
++++ b/mscore/plugin/pluginCreator.cpp
+@@ -394,7 +394,7 @@ void PluginCreator::closePlugin()
+             view->close();
+       if (dock)
+             dock->close();
+-      qInstallMessageHandler(0);
++      qInstallMessageHandler(MScore::msgHandler);
+       raise();
+       }
+ 

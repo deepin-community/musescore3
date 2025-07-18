@@ -1,0 +1,9 @@
+{
+  "Archive": "GitHub",
+  "Bug-Database": "https://musescore.org/en/project/issues/musescore",
+  "Changelog": "https://musescore.org/en/handbook/developers-handbook/release-notes",
+  "FAQ": "https://musescore.org/en/faq",
+  "Name": "Mu͒seScore Studio",
+  "Repository": "git@github.com:musescore/MuseScore.git",
+  "Repository-Browse": "https://github.com/musescore/MuseScore"
+}

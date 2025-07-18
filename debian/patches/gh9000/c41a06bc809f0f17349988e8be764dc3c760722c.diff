@@ -1,0 +1,16 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: Fix #321809: Crash when pasting note(head) onto MMRest
+
+--- a/libmscore/rest.cpp
++++ b/libmscore/rest.cpp
+@@ -189,7 +189,7 @@ bool Rest::acceptDrop(EditData& data) co
+          || (type == ElementType::BAR_LINE)
+          || (type == ElementType::BREATH)
+          || (type == ElementType::CHORD)
+-         || (type == ElementType::NOTE)
++         || (type == ElementType::NOTE && !measure()->isMMRest()) // avoid crash
+          || (type == ElementType::STAFF_STATE)
+          || (type == ElementType::INSTRUMENT_CHANGE)
+          || (type == ElementType::DYNAMIC)

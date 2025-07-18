@@ -1,0 +1,23 @@
+Origin: upstream, commit:4857c4117ae2bf0829ede78c3572801f5c4fee73
+Author: Leon Vinken <leon.vinken@gmail.com>
+Description: fix #287475 - crash on open MusicXML file lacking time signature
+
+--- a/mscore/importmxmlpass1.cpp
++++ b/mscore/importmxmlpass1.cpp
+@@ -2054,11 +2054,15 @@ void MusicXMLParserPass1::measure(const
+       // measure duration fixups
+       mDura.reduce();
+ 
+-      // fix for PDFtoMusic Pro v1.3.0d Build BF4E (which sometimes generates empty measures)
++      // fix for PDFtoMusic Pro v1.3.0d Build BF4E and PlayScore / ReadScoreLib Version 3.11
++      // which sometimes generate empty measures
+       // if no valid length found and length according to time signature is known,
+       // use length according to time signature
+       if (mDura.isZero() && _timeSigDura.isValid() && _timeSigDura > Fraction(0, 1))
+             mDura = _timeSigDura;
++      // if no valid length found and time signature is unknown, use default
++      if (mDura.isZero() && !_timeSigDura.isValid())
++            mDura = Fraction(4, 4);
+ 
+       // if necessary, round up to an integral number of 1/64s,
+       // to comply with MuseScores actual measure length constraints

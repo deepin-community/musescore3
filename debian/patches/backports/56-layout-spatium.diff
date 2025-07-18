@@ -1,0 +1,25 @@
+Origin: upstream, commit:71771cd4e3962d0c66fda0321aca883a228f51fa
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #188061: values in sp unit don't remain unchanged after changing spatium
+ This is simply because `Score::spatiumChanged()` isn't called after
+ applying changes in Page Settings dialogue. It is called for the
+ preview score in the dialogue though, so the preview score has the
+ correct display, but not the main score.
+
+--- a/mscore/pagesettings.cpp
++++ b/mscore/pagesettings.cpp
+@@ -304,7 +304,13 @@ void PageSettings::applyToScore(Score* s
+       s->undoChangeStyleVal(Sid::pageOddBottomMargin, oddPageBottomMargin->value() * f);
+       s->undoChangeStyleVal(Sid::pageOddLeftMargin, oddPageLeftMargin->value() * f);
+       s->undoChangeStyleVal(Sid::pageTwosided, twosided->isChecked());
+-      s->undoChangeStyleVal(Sid::spatium, spatiumEntry->value() * f1);
++
++      qreal oldSpatium = s->spatium();
++      qreal newSpatium = spatiumEntry->value() * f1;
++      s->undoChangeStyleVal(Sid::spatium, newSpatium);
++      if (oldSpatium != newSpatium)
++            s->spatiumChanged(oldSpatium, newSpatium);
++
+       s->undoChangePageNumberOffset(pageOffsetEntry->value() - 1);
+ 
+       s->endCmd();

@@ -1,0 +1,15 @@
+Origin: upstream, commit:da507a5dc9839a39874801d348244f346dd5517a
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #283319: Time Signature disappears
+
+--- a/libmscore/style.cpp
++++ b/libmscore/style.cpp
+@@ -2323,7 +2323,7 @@ bool MStyle::readProperties(XmlReader& e
+                         e.readElementText();
+                         }
+                   else if (!strcmp("QSizeF", type)) {
+-                        qreal x = e.intAttribute("w", 0);
++                        qreal x = e.doubleAttribute("w", 0.0);
+                         qreal y = e.doubleAttribute("h", 0.0);
+                         set(idx, QSizeF(x, y));
+                         e.readElementText();

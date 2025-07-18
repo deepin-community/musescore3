@@ -1,0 +1,26 @@
+Origin: upstream, commit:72c6b76708d5c1069bcc1630b4ae4803c76da8b3
+Author: Howard-C <howardc@pku.edu.cn>
+Description: fix #297477: apply alla breve to 4/4 changes to 2/2 instead
+ Resolves: https://musescore.org/en/node/297477.
+ .
+ 4/4 and alla breve have different `_sig` value, so `setSig()` is
+ called, but if it's called after `_timeSigType` is changed, `setSig()`
+ will make the type `NORMAL` again, because if it's called by
+ `setProperty()`, there isn't a `TimeSigType` parameter available
+ (making it available will cause further issues), so `setSig()` uses the
+ default `NORMAL` as the type, thus the new type is overwritten.
+ .
+ If `setSig()` is called before `_timeSigType` is changed, all will be fine.
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -774,8 +774,8 @@ void Score::cmdAddTimeSig(Measure* fm, i
+             for (int si = 0; si < n; ++si) {
+                   TimeSig* nsig = toTimeSig(seg->element(si * VOICES));
+                   nsig->undoChangeProperty(Pid::SHOW_COURTESY, ts->showCourtesySig());
+-                  nsig->undoChangeProperty(Pid::TIMESIG_TYPE, int(ts->timeSigType()));
+                   nsig->undoChangeProperty(Pid::TIMESIG, QVariant::fromValue(ts->sig()));
++                  nsig->undoChangeProperty(Pid::TIMESIG_TYPE, int(ts->timeSigType()));
+                   nsig->undoChangeProperty(Pid::NUMERATOR_STRING, ts->numeratorString());
+                   nsig->undoChangeProperty(Pid::DENOMINATOR_STRING, ts->denominatorString());
+                   nsig->undoChangeProperty(Pid::TIMESIG_STRETCH, QVariant::fromValue(ts->stretch()));

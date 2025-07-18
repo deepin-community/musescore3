@@ -1,0 +1,14 @@
+Origin: upstream, commit:0c1e286c8dd6ab0a55b031c886de1a2d394b29d2
+Author: Joachim Schmitz <jojo@schmitz-digital.de>
+Description: fix #307593: prevent duplicated icon on Ubuntu
+
+--- a/build/Linux+BSD/mscore.desktop.in
++++ b/build/Linux+BSD/mscore.desktop.in
+@@ -10,6 +10,7 @@ Comment[fr]=Gravure de partitions musica
+ Exec=mscore@MSCORE_INSTALL_SUFFIX@ %F
+ Icon=mscore@MSCORE_INSTALL_SUFFIX@
+ StartupNotify=true
++StartupWMClass=mscore@MSCORE_INSTALL_SUFFIX@
+ Terminal=false
+ Type=Application
+ Categories=Qt;Audio;Sequencer;Midi;AudioVideoEditing;Music;AudioVideo;

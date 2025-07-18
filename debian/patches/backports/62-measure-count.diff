@@ -1,0 +1,21 @@
+Origin: upstream, commit:bb057bb87e7d018dc5057b69de96ee7b644357a6
+Author: Niek van den Berg <njvdberg@xs4all.nl>
+Description: Fix #306333 - Various type of edits change the measure count
+ After a modification, a re-layout is triggered starting at the beginning of the
+ system. The measure number of the first measure of the system is taken adding 1
+ to the measure number of the last measure of previous system. However it was not
+ taken into account whether that measure was excluded from measure count.
+
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -4445,8 +4445,8 @@ void Score::doLayoutRange(const Fraction
+                   if (sectionBreak && sectionBreak->startWithMeasureOne())
+                         lc.measureNo = 0;
+                   else
+-                        lc.measureNo = lc.nextMeasure->prevMeasure()->no() + 1; // will be adjusted later with respect
+-                                                                                // to the user-defined offset.
++                        lc.measureNo = lc.nextMeasure->prevMeasure()->no()                     // will be adjusted later with respect
++                                       + (lc.nextMeasure->prevMeasure()->irregular() ? 0 : 1); // to the user-defined offset.
+                   lc.tick      = lc.nextMeasure->tick();
+                   }
+             }

@@ -1,0 +1,64 @@
+# github doesn’t expose those
+musescore3 source: debian-watch-does-not-check-openpgp-signature
+
+# oh really?! what the ever…
+musescore3 source: cute-field
+
+# these are *deliberately* out of order, as any and all
+# CMakeLists.txt files in the project are licenced differently
+musescore3 source: globbing-patterns-out-of-order thirdparty/* *CMakeLists.txt*
+# mscore/widgets/CMakeLists.txt is handled below both so the result is right
+musescore3 source: globbing-patterns-out-of-order mscore/widgets/* *CMakeLists.txt*
+
+# wtf lintian, this is literally example source
+musescore3 source: source-is-missing [thirdparty/singleapp/doc/html/qtsingleapplication-example-loader.html]
+# false positive, source is there
+musescore3 source: source-is-missing [thirdparty/singleapp/doc/html/qtsingleapplication.html]
+
+# oh, go away (it’s only a temp stage anyway)
+musescore3 source: prefer-uscan-symlink
+
+# binary files
+musescore3 source: very-long-line-length-in-source-file *.ae0:*
+musescore3 source: very-long-line-length-in-source-file *.capx:*
+musescore3 source: very-long-line-length-in-source-file *.enc:*
+musescore3 source: very-long-line-length-in-source-file *.gp3:*
+musescore3 source: very-long-line-length-in-source-file *.gp4:*
+musescore3 source: very-long-line-length-in-source-file *.gp5:*
+musescore3 source: very-long-line-length-in-source-file *.gpx:*
+musescore3 source: very-long-line-length-in-source-file *.mid:*
+musescore3 source: very-long-line-length-in-source-file *.mscz:*
+musescore3 source: very-long-line-length-in-source-file *.mxl:*
+musescore3 source: very-long-line-length-in-source-file *.ove:*
+musescore3 source: very-long-line-length-in-source-file *.scw:*
+musescore3 source: very-long-line-length-in-source-file *.SGU:*
+musescore3 source: very-long-line-length-in-source-file 1317 > 512 [build/appveyor/special/Command Prompt.lnk:2]
+musescore3 source: very-long-line-length-in-source-file 549 > 512 [share/plugins/helloqml/translations/locale_de.qm:2]
+
+# yup, admittedly, but it’s just an unwrapped documentation tag in XML
+musescore3 source: very-long-line-length-in-source-file 1046 > 512 [mscore/schema/musicxml.xsd:1394]
+musescore3 source: very-long-line-length-in-source-file 519 > 512 [thirdparty/singleapp/doc/html/qtsingleapplication-example-loader.html:168]
+musescore3 source: very-long-line-length-in-source-file 649 > 512 [thirdparty/singleapp/doc/html/qtsingleapplication.html:85]
+musescore3 source: very-long-line-length-in-source-file * > 512 [share/locale/*.ts:*
+musescore3 source: very-long-line-length-in-source-file 634 > 512 [mscore/aboutbox.ui:160]
+musescore3 source: very-long-line-length-in-source-file 609 > 512 [mscore/uploadscoredialog.ui:148]
+musescore3 source: very-long-line-length-in-source-file 559 > 512 [build/appveyor/web/index.html.tpl:17]
+musescore3 source: very-long-line-length-in-source-file 562 > 512 [build/travis/job_macos/web/index.html.tpl:17]
+# same in plaintext
+musescore3 source: very-long-line-length-in-source-file 608 > 512 [omr/README.md:6]
+musescore3 source: very-long-line-length-in-source-file 789 > 512 [thirdparty/kQOAuth/README.md:4]
+musescore3 source: very-long-line-length-in-source-file 635 > 512 [fonts/README.md:20]
+musescore3 source: very-long-line-length-in-source-file 598 > 512 [fonts/bravura/FONTLOG.txt:45]
+musescore3 source: very-long-line-length-in-source-file 1362 > 512 [fonts/bravura/OFL-FAQ.txt:101]
+musescore3 source: very-long-line-length-in-source-file 618 > 512 [fonts/bravura/bravura-text.md:57]
+musescore3 source: very-long-line-length-in-source-file 3536 > 512 [fonts/mscore/mscore.sfd:6]
+musescore3 source: very-long-line-length-in-source-file * > 512 [debian/patches/upstream/improve-mscore-font.diff*
+musescore3 source: very-long-line-length-in-source-file 5060 > 512 [fonts/mscore/MScoreText.sfd:78]
+musescore3 source: very-long-line-length-in-source-file *.sfz:*
+# same in C
+musescore3 source: very-long-line-length-in-source-file 561 > 512 [mscore/prefsdialog.cpp:1025]
+# same in I can’t even
+musescore3 source: very-long-line-length-in-source-file 809 > 512 [LICENSE.rtf:74]
+
+# long unwrapped string in test
+musescore3 source: very-long-line-length-in-source-file 944 > 512 [mtest/libmscore/repeat/tst_repeat.cpp:81]

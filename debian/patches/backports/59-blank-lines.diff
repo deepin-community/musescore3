@@ -1,0 +1,177 @@
+Origin: upstream, commit:25f92afae6374e1d610efd5b43b8effab36cf21b
+Author: SKefalidis <megistios@gmail.com>
+Description: fix #307721: blank lines ignored at top of text elements
+
+--- a/libmscore/textbase.cpp
++++ b/libmscore/textbase.cpp
+@@ -705,11 +705,33 @@ void TextBlock::layout(TextBase* t)
+                         break;
+                   }
+             }
++
+       if (_fragments.empty()) {
+             QFontMetricsF fm = t->fontMetrics();
+             _bbox.setRect(0.0, -fm.ascent(), 1.0, fm.descent());
+             _lineSpacing = fm.lineSpacing();
+             }
++      else if (_fragments.size() == 1 && _fragments.at(0).text.isEmpty()) {
++            auto fi = _fragments.begin();
++            TextFragment& f = *fi;
++            f.pos.setX(x);
++            QFontMetricsF fm(f.font(t), MScore::paintDevice());
++            if (f.format.valign() != VerticalAlignment::AlignNormal) {
++                  qreal voffset = fm.xHeight() / subScriptSize;   // use original height
++                  if (f.format.valign() == VerticalAlignment::AlignSubScript)
++                        voffset *= subScriptOffset;
++                  else
++                        voffset *= superScriptOffset;
++                  f.pos.setY(voffset);
++                  }
++            else {
++                  f.pos.setY(0.0);
++                  }
++
++            QRectF temp(0.0, -fm.ascent(), 1.0, fm.descent());
++            _bbox |= temp;
++            _lineSpacing = qMax(_lineSpacing, fm.lineSpacing());
++            }
+       else {
+             for (TextFragment& f : _fragments) {
+                   f.pos.setX(x);
+@@ -744,6 +766,24 @@ void TextBlock::layout(TextBase* t)
+       }
+ 
+ //---------------------------------------------------------
++//   fragmentsWithoutEmpty
++//---------------------------------------------------------
++
++QList<TextFragment>* TextBlock::fragmentsWithoutEmpty()
++      {
++      QList<TextFragment>* list = new QList<TextFragment>();
++      for (auto x :_fragments) {
++            if (x.text.isEmpty()) {
++                  continue;
++                  }
++            else {
++                  list->append(x);
++                  }
++            }
++      return list;
++      }
++
++//---------------------------------------------------------
+ //   xpos
+ //---------------------------------------------------------
+ 
+@@ -899,8 +939,9 @@ void TextBlock::insert(TextCursor* curso
+ 
+ void TextBlock::insertEmptyFragmentIfNeeded(TextCursor* cursor)
+       {
+-      if (_fragments.size() == 0 || _fragments.at(0).text != "")
++      if (_fragments.size() == 0 || _fragments.at(0).text.isEmpty()) {
+             _fragments.insert(0, TextFragment(cursor, ""));
++            }
+       }
+ 
+ //---------------------------------------------------------
+@@ -1136,7 +1177,7 @@ void TextFragment::changeFormat(FormatId
+ //   split
+ //---------------------------------------------------------
+ 
+-TextBlock TextBlock::split(int column)
++TextBlock TextBlock::split(int column, Ms::TextCursor* cursor)
+       {
+       TextBlock tl;
+ 
+@@ -1156,6 +1197,8 @@ TextBlock TextBlock::split(int column)
+                               }
+                         for (; i != _fragments.end(); i = _fragments.erase(i))
+                               tl._fragments.append(*i);
++                        if (_fragments.size() == 0)
++                              insertEmptyFragmentIfNeeded(cursor);
+                         return tl;
+                         }
+                   ++idx;
+@@ -1167,6 +1210,8 @@ TextBlock TextBlock::split(int column)
+       TextFragment tf("");
+       if (_fragments.size() > 0)
+             tf.format = _fragments.last().format;
++      else if (_fragments.size() == 0)
++            insertEmptyFragmentIfNeeded(cursor);
+       tl._fragments.append(tf);
+       return tl;
+       }
+@@ -1327,7 +1372,7 @@ static qreal parseNumProperty(const QStr
+ 
+ void TextBase::createLayout()
+       {
+-      _layout.clear();
++      _layout.clear();  // deletes the text fragments so we lose all formatting information
+       TextCursor cursor((Text*)this);
+       cursor.init();
+ 
+@@ -1716,8 +1761,9 @@ void TextBase::genText() const
+ 
+       for (const TextBlock& block : _layout) {
+             for (const TextFragment& f : block.fragments()) {
+-                  if (f.text.isEmpty())                     // skip empty fragments, not to
+-                        continue;                           // insert extra HTML formatting
++                  // don't skip, empty text fragments hold information for empty lines
++//                  if (f.text.isEmpty())                     // skip empty fragments, not to
++//                        continue;                           // insert extra HTML formatting
+                   const CharFormat& format = f.format;
+                   if (fmt.bold() != format.bold()) {
+                         if (format.bold())
+--- a/libmscore/textbase.h
++++ b/libmscore/textbase.h
+@@ -189,6 +189,7 @@ class TextBlock {
+       void layout(TextBase*);
+       const QList<TextFragment>& fragments() const { return _fragments; }
+       QList<TextFragment>& fragments()             { return _fragments; }
++      QList<TextFragment>* fragmentsWithoutEmpty();
+       const QRectF& boundingRect() const           { return _bbox; }
+       QRectF boundingRect(int col1, int col2, const TextBase*) const;
+       int columns() const;
+@@ -198,7 +199,7 @@ class TextBlock {
+       QString remove(int column, TextCursor*);
+       QString remove(int start, int n, TextCursor*);
+       int column(qreal x, TextBase*) const;
+-      TextBlock split(int column);
++      TextBlock split(int column, TextCursor* cursor);
+       qreal xpos(int col, const TextBase*) const;
+       const CharFormat* formatAt(int) const;
+       const TextFragment* fragment(int col) const;
+--- a/libmscore/textedit.cpp
++++ b/libmscore/textedit.cpp
+@@ -448,15 +448,21 @@ void SplitJoinText::join(EditData* ed)
+       CharFormat* charFmt = c.format();         // take current format
+       int col             = t->textBlock(line-1).columns();
+       int eol             = t->textBlock(line).eol();
+-      t->textBlock(line-1).fragments().append(t->textBlock(line).fragments());
++      auto fragmentsList = t->textBlock(line).fragmentsWithoutEmpty();
++      if (fragmentsList->size() > 0)
++            t->textBlock(line-1).removeEmptyFragment();
++      t->textBlock(line-1).fragments().append(*fragmentsList);
++      delete fragmentsList;
+       int lines = t->rows();
+       if (line < lines)
+             t->textBlock(line).setEol(eol);
+       t->textBlockList().removeAt(line);
++
+       c.setRow(line-1);
+       c.setColumn(col);
+       c.setFormat(*charFmt);             // restore orig. format at new line
+       c.clearSelection();
++
+       if (ed)
+             *t->cursor(*ed) = c;
+       c.text()->setTextInvalid();
+@@ -470,7 +476,7 @@ void SplitJoinText::split(EditData* ed)
+       t->triggerLayout();
+ 
+       CharFormat* charFmt = c.format();         // take current format
+-      t->textBlockList().insert(line + 1, c.curLine().split(c.column()));
++      t->textBlockList().insert(line + 1, c.curLine().split(c.column(), t->cursor(*ed)));
+       c.curLine().setEol(true);
+ 
+       c.setRow(line+1);

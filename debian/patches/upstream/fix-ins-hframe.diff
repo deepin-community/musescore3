@@ -1,0 +1,31 @@
+Origin: upstream, commit:1ed931a11c1b3ef05cd336bac2ea853a206f6d77
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #306612: insert horizontal frame in front of frame using palette
+ .
+ Resolves: https://musescore.org/en/node/306612
+ .
+ You can select a frame and insert any other type of frame in front
+ using the palette, but you cannot insert a horizontal frame this way.
+ Cause is simple: missing handler for this in acceptDrop() and drop().
+ Fix is trivial.
+
+--- a/libmscore/box.cpp
++++ b/libmscore/box.cpp
+@@ -499,6 +499,7 @@ bool Box::acceptDrop(EditData& data) con
+                         case IconType::VFRAME:
+                         case IconType::TFRAME:
+                         case IconType::FFRAME:
++                        case IconType::HFRAME:
+                         case IconType::MEASURE:
+                               return true;
+                         default:
+@@ -575,6 +576,9 @@ Element* Box::drop(EditData& data)
+                         case IconType::FFRAME:
+                               score()->insertMeasure(ElementType::FBOX, this);
+                               break;
++                        case IconType::HFRAME:
++                              score()->insertMeasure(ElementType::HBOX, this);
++                              break;
+                         case IconType::MEASURE:
+                               score()->insertMeasure(ElementType::MEASURE, this);
+                               break;

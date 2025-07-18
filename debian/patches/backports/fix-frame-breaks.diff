@@ -1,0 +1,193 @@
+Origin: upstream, commit:d8fa6e6dea4184fa7b43085a69eac6fb5597dd62
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #288098, #307301, #305958, #295629: interactions between breaks and frames
+ .
+ Resolves: https://musescore.org/en/node/288098
+ Resolves: https://musescore.org/en/node/307301
+ Resolves: https://musescore.org/en/node/305958
+ Resolves: https://musescore.org/en/node/295629
+ .
+ A number of bugs all turn out to be related to a single root cause,
+ where we don't correctly handle checking for section breaks in the
+ presence of frames.
+ In the case of the long instrument name showing inappropriately, it's
+ because in the case where the previous systems is just a frame, we
+ don't see any measure, so we fall back to relying on the layout of the
+ previous system having already set up the context for us. This isn't
+ necessarily valid when doing partial layout.
+ So we need to check more thoroughly here, accepting a frame if it has a
+ section break itself, but otherwise searching backwards looking for
+ frame with a break or a measure.
+ That is, we need to skip break-less frames when looking to see if we
+ are starting a section. I have therefore implemented such a function.
+ .
+ This turns out to also fix an issue with horizontal frames, where a
+ break on a horizontal frame ending a system was being ignored for the
+ purpose of setting long names.
+ .
+ The same applies to the new first system indent facility, so while
+ these bugs are not recent regressions, they take on new importance in
+ 3.6.
+ .
+ The new function is also used to fix a related by with measure numbers,
+ where a frame could get in the way of resetting them after a section
+ break. It is used again to solve the corresponding issue on MusicXML
+ export.
+ .
+ Along the way I discovered a bug leading to an assertion failure when
+ deleting breaks attached to frames, so I needed to fix that by making
+ sure LayoutBreak::measure() doesn't assume its parent is in fact an
+ actual Measure as opposed to a MeasureBase.
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -1801,8 +1801,9 @@ void Score::deleteItem(Element* el)
+                   {
+                   undoRemoveElement(el);
+                   LayoutBreak* lb = toLayoutBreak(el);
+-                  Measure* m = lb->measure();
+-                  if (m->isMMRest()) {
++                  MeasureBase* mb = lb->measure();
++                  Measure* m = mb && mb->isMeasure() ? toMeasure(mb) : nullptr;
++                  if (m && m->isMMRest()) {
+                         // propagate to original measure
+                         m = m->mmRestLast();
+                         foreach(Element* e, m->el()) {
+@@ -4230,7 +4231,7 @@ void Score::undoAddElement(Element* elem
+       if (et == ElementType::LAYOUT_BREAK) {
+             LayoutBreak* lb = toLayoutBreak(element);
+             if (lb->layoutBreakType() == LayoutBreak::Type::SECTION) {
+-                  Measure* m = lb->measure();
++                  MeasureBase* m = lb->measure();
+                   for (Score* s : scoreList()) {
+                         if (s == lb->score())
+                               undo(new AddElement(lb));
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -3264,7 +3264,9 @@ System* Score::collectSystem(LayoutConte
+       {
+       if (!lc.curMeasure)
+             return 0;
+-      Measure* measure  = _systems.empty() ? 0 : _systems.back()->lastMeasure();
++      const MeasureBase* measure  = _systems.empty() ? 0 : _systems.back()->measures().back();
++      if (measure)
++            measure = measure->findPotentialSectionBreak();
+       if (measure) {
+             lc.firstSystem        = measure->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
+             lc.startWithLongNames = lc.firstSystem && measure->sectionBreakElement()->startWithLongNames();
+@@ -3364,6 +3366,10 @@ System* Score::collectSystem(LayoutConte
+                   // measure in the system and we finally can create the end barline for it
+ 
+                   Measure* m = toMeasure(lc.prevMeasure);
++                  // TODO: if lc.curMeasure is a frame, removing the trailer may be premature
++                  // but merely skipping this code isn't good enough,
++                  // we need to find the right time to re-enable the trailer,
++                  // since it seems to be disabled somewhere else
+                   if (m->trailer()) {
+                         qreal ow = m->width();
+                         m->removeSystemTrailer();
+@@ -3384,6 +3390,12 @@ System* Score::collectSystem(LayoutConte
+                                     }
+                               }
+                         }
++                  // TODO: we actually still don't know for sure
++                  // if this will be the last true measure of the system or not
++                  // since the lc.curMeasure may be a frame
++                  // but at this point we have no choice but to assume it isn't
++                  // since we don't know yet if another true measure will fit
++                  // worst that happens is we don't get the automatic double bar before a courtesy key signature
+                   minWidth += m->createEndBarLines(false);    // create final barLine
+                   }
+ 
+@@ -3439,6 +3451,7 @@ System* Score::collectSystem(LayoutConte
+                               if (!s->enabled())
+                                     s->setEnabled(true);
+                               }
++                        // TODO: use findPotentialSectionBreak here to handle breaks on frames correctly?
+                         bool firstSystem = lc.prevMeasure->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
+                         if (curHeader)
+                               m->addSystemHeader(firstSystem);
+@@ -3574,12 +3587,18 @@ System* Score::collectSystem(LayoutConte
+       layoutSystemElements(system, lc);
+       system->layout2();   // compute staff distances
+ 
+-      lm  = system->lastMeasure();
+-      if (lm) {
+-            lc.firstSystem        = lm->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
+-            lc.startWithLongNames = lc.firstSystem && lm->sectionBreakElement()->startWithLongNames();
++      // TODO: now that the code at the top of this function does this same backwards search,
++      // we might be able to eliminate this block
++      // but, lc might be used elsewhere so we need to be careful
++#if 1
++      measure = system->measures().back();
++      if (measure)
++            measure = measure->findPotentialSectionBreak();
++      if (measure) {
++            lc.firstSystem        = measure->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
++            lc.startWithLongNames = lc.firstSystem && measure->sectionBreakElement()->startWithLongNames();
+             }
+-
++#endif
+       return system;
+       }
+ 
+@@ -4441,7 +4460,12 @@ void Score::doLayoutRange(const Fraction
+                   lc.tick      = Fraction(0,1);
+                   }
+             else {
+-                  LayoutBreak* sectionBreak = lc.nextMeasure->prevMeasure()->sectionBreakElement();
++                  const MeasureBase* mb = lc.nextMeasure->prev();
++                  if (mb)
++                        mb->findPotentialSectionBreak();
++                  LayoutBreak* sectionBreak = mb->sectionBreakElement();
++                  // TODO: also use mb in else clause here?
++                  // probably not, only actual measures have meaningful numbers
+                   if (sectionBreak && sectionBreak->startWithMeasureOne())
+                         lc.measureNo = 0;
+                   else
+--- a/libmscore/layoutbreak.h
++++ b/libmscore/layoutbreak.h
+@@ -62,7 +62,7 @@ class LayoutBreak final : public Element
+       virtual void write(XmlWriter&) const override;
+       virtual void read(XmlReader&) override;
+ 
+-      Measure* measure() const            { return (Measure*)parent();   }
++      MeasureBase* measure() const        { return (MeasureBase*)parent(); }
+       qreal pause() const                 { return _pause;               }
+       void setPause(qreal v)              { _pause = v;                  }
+       bool startWithLongNames() const     { return _startWithLongNames;  }
+--- a/libmscore/measurebase.cpp
++++ b/libmscore/measurebase.cpp
+@@ -259,6 +259,22 @@ Measure* MeasureBase::prevMeasureMM() co
+       }
+ 
+ //---------------------------------------------------------
++//   findPotentialSectionBreak
++//---------------------------------------------------------
++
++const MeasureBase *MeasureBase::findPotentialSectionBreak() const
++      {
++      // we're trying to find the MeasureBase that determines
++      // if the next one after this starts a new section
++      // if this is a measure, it's the one that determines this
++      // but if it is a frame, we may need to look backwards
++      const MeasureBase* mb = this;
++      while (mb && !mb->isMeasure() && !mb->sectionBreak())
++            mb = mb->prev();
++      return mb;
++      }
++
++//---------------------------------------------------------
+ //   pause
+ //---------------------------------------------------------
+ 
+--- a/libmscore/measurebase.h
++++ b/libmscore/measurebase.h
+@@ -105,6 +105,7 @@ class MeasureBase : public Element {
+       System* system() const                 { return (System*)parent(); }
+       void setSystem(System* s)              { setParent((Element*)s);   }
+ 
++      const MeasureBase* findPotentialSectionBreak() const;
+       LayoutBreak* sectionBreakElement() const;
+ 
+       void undoSetBreak(bool v, LayoutBreak::Type type);

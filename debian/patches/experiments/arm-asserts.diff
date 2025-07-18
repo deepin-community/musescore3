@@ -1,0 +1,156 @@
+Description: forcibly enable Q_ASSERT{,_X} checks
+ Some security-relevant checks are hidden behind assertions by upstream;
+ to help alleviate CVE-2023-44428 and possibly other issues, arm asserts
+ which increases safety at the risk of more crashes (which can then be
+ investigated, hence the verbosity of the info). Much of this is specific
+ to glibc-based systems though.
+ .
+ For now, we arm the abort() end as opt-in, but in a subsequent upload,
+ it will be opt-out instead for security.
+Author: mirabilos <tg@debian.org>
+Forwarded: no
+
+--- a/all.h
++++ b/all.h
+@@ -206,15 +206,17 @@
+ 
+ #include <QJsonDocument>
+ 
++// QT_FORCE_ASSERTS exists, but it is officially undocumented,
++// use is disrecommended, so roll our own
+ 
+-// change Q_ASSERT to NOP if not debugging
++void mudeb_assert_(const char *, const char *, const char *, const char *, int, int);
+ 
+-#ifdef QT_NO_DEBUG
+ #undef Q_ASSERT_X
+-#define Q_ASSERT_X(a,b,c)
++#define Q_ASSERT_X(test,where,what) (__builtin_expect(!(test), 0) ? mudeb_assert_(__FILE__, __PRETTY_FUNCTION__, where, what, __LINE__, 1) : qt_noop())
+ #undef Q_ASSERT
+-#define Q_ASSERT(a)
+-#endif
++#define Q_ASSERT(test) (__builtin_expect(!(test), 0) ? mudeb_assert_(__FILE__, __PRETTY_FUNCTION__, NULL, #test, __LINE__, 0) : qt_noop())
++#undef Q_CHECK_PTR
++#define Q_CHECK_PTR(p) Q_ASSERT_X((p), "Q_CHECK_PTR", #p)
+ 
+ #if (defined (_MSCVER) || defined (_MSC_VER))
+    // Undefined problematic #def'd macros in Microsoft headers
+--- /dev/null
++++ b/ass.cpp
+@@ -0,0 +1,60 @@
++/*-
++ * Copyright © 2024
++ *	mirabilos <m$(date +%Y)@mirbsd.de>
++ *
++ * Provided that these terms and disclaimer and all copyright notices
++ * are retained or reproduced in an accompanying document, permission
++ * is granted to deal in this work without restriction, including un‐
++ * limited rights to use, publicly perform, distribute, sell, modify,
++ * merge, give away, or sublicence.
++ *
++ * This work is provided “AS IS” and WITHOUT WARRANTY of any kind, to
++ * the utmost extent permitted by applicable law, neither express nor
++ * implied; without malicious intent or gross negligence. In no event
++ * may a licensor, author or contributor be held liable for indirect,
++ * direct, other damage, loss, or other issues arising in any way out
++ * of dealing in the work, even if advised of the possibility of such
++ * damage or existence of a defect, except proven that it results out
++ * of said person’s immediate fault when using the work as intended.
++ */
++
++#ifndef __ALLQT_H__
++# error The all.h file was not auto-included first.
++#endif
++
++#include <execinfo.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#define NBT 128
++static void *btbuffer[NBT];
++
++void
++mudeb_assert_(const char *xfile, const char *xfunc, const char *where, const char *what, int xline, int xisx)
++{
++	char **bt;
++	int nbt;
++
++	fflush(NULL);
++	if (xisx)
++		fprintf(stderr, "\r\nE: %s{%s}:%d: assertion failed in %s: %s\n",
++		    xfile, xfunc, xline, where ? where : "(nil)", what ? what : "(nil)");
++	else
++		fprintf(stderr, "\r\nE: %s{%s}:%d: assertion failed: %s\n",
++		    xfile, xfunc, xline, what);
++	fflush(stderr);
++	if ((nbt = backtrace(btbuffer, NBT)) > 0 &&
++	    (bt = backtrace_symbols(btbuffer, nbt))) {
++		int i;
++
++		for (i = 0; i < nbt; ++i) {
++			fprintf(stderr, "N:  %s\n", bt[i]);
++			fflush(stderr);
++		}
++		fprintf(stderr, "N: end of backtrace\n");
++		fflush(stderr);
++		free(bt);
++	}
++	if (getenv("MSCORE_ASSERT_ABORT") != NULL)
++		abort();
++}
+--- a/build/Linux+BSD/mscore.1.in
++++ b/build/Linux+BSD/mscore.1.in
+@@ -3,7 +3,7 @@
+ .\"	mirabilos <m@mirbsd.org>
+ .\" Published under the same terms as MuseScore itself.
+ .\"-
+-.Dd March 20, 2019
++.Dd April 21, 2025
+ .Dt @MAN_MSCORE_UPPER@ 1
+ .Os MuseScore
+ .Sh NAME@Variables_substituted_by_CMAKE_on_installation@
+@@ -360,6 +360,8 @@ uncompressed MusicXML file
+ See below for an example.
+ .Sh ENVIRONMENT
+ .Bl -tag -width Ds
++.It Ev MSCORE_ASSERT_ABORT
++Assertion failures are fatal if set (the value does not matter).
+ .It Ev SKIP_LIBJACK
+ Set this (the value does not matter) to skip initialisation
+ of the JACK Audio Connection Kit library, in case it causes trouble.
+--- a/bww2mxml/CMakeLists.txt
++++ b/bww2mxml/CMakeLists.txt
+@@ -50,6 +50,7 @@ if (NOT MINGW AND NOT APPLE AND NOT MSVC
+       parser.cpp
+       symbols.cpp
+       writer.cpp
++      ${PROJECT_SOURCE_DIR}/ass.cpp
+       )
+ 
+    set_target_properties (
+--- a/libmscore/CMakeLists.txt
++++ b/libmscore/CMakeLists.txt
+@@ -41,6 +41,7 @@ add_library (
+       libmscore STATIC
+       ${_all_h_file}
+       ${INCS}
++      ${PROJECT_SOURCE_DIR}/ass.cpp
+ 
+       types.h accidental.h ambitus.h arpeggio.h articulation.h audio.h bagpembell.h barline.h beam.h bend.h
+       box.h bracket.h bracketItem.h breath.h bsp.h bsymbol.h chord.h chordline.h chordlist.h chordrest.h clef.h
+--- a/mtest/CMakeLists.txt
++++ b/mtest/CMakeLists.txt
+@@ -140,6 +140,13 @@ endif (MSVC)
+ add_executable(
+       mtest
+       mtest.cpp
++      ${PROJECT_SOURCE_DIR}/ass.cpp
++      )
++
++set_target_properties(
++      mtest
++      PROPERTIES
++      COMPILE_FLAGS "-include all.h"
+       )
+ 
+ target_link_libraries(

@@ -1,0 +1,14 @@
+Origin: upstream, commit:34982d31c3b8f69416361af0b181bcbc70d89bce
+Author: JoshuaBonn1 <joshuabonn96@gmail.com>
+Description: Fix #279024: double click on mixer's dial and sliders should reset them to their defaults
+
+--- a/mscore/mixertrackpart.cpp
++++ b/mscore/mixertrackpart.cpp
+@@ -124,6 +124,7 @@ MixerTrackPart::MixerTrackPart(QWidget *
+       panSlider->setToolTip(tr("Pan: %1").arg(QString::number(chan->pan())));
+       panSlider->setMaxValue(127);
+       panSlider->setMinValue(0);
++      panSlider->setDclickValue1(64);
+ 
+       connect(volumeSlider, SIGNAL(valueChanged(double)),      SLOT(volumeChanged(double)));
+       connect(panSlider,    SIGNAL(valueChanged(double, int)), SLOT(panChanged(double)));

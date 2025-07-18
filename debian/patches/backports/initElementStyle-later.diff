@@ -1,0 +1,74 @@
+Origin: upstream, commit:7ec409722d79bfca2eb1877006b1efc7d5aaa308
+Author: Niek van den Berg <njvdberg@xs4all.nl>
+Description: Make sure initElementStyle() is called after
+ initialising the member to provide style settings are overwritten
+ by the member initialisation.
+
+--- a/libmscore/articulation.cpp
++++ b/libmscore/articulation.cpp
+@@ -42,13 +42,13 @@ static const ElementStyle articulationSt
+ Articulation::Articulation(Score* s)
+    : Element(s, ElementFlag::MOVABLE)
+       {
+-      initElementStyle(&articulationStyle);
+       _symId         = SymId::noSym;
+       _anchor        = ArticulationAnchor::TOP_STAFF;
+       _direction     = Direction::AUTO;
+       _up            = true;
+       _ornamentStyle = MScore::OrnamentStyle::DEFAULT;
+       setPlayArticulation(true);
++      initElementStyle(&articulationStyle);
+       }
+ 
+ Articulation::Articulation(SymId id, Score* s)
+--- a/libmscore/dynamic.cpp
++++ b/libmscore/dynamic.cpp
+@@ -103,12 +103,12 @@ const std::vector<Dynamic::ChangeSpeedIt
+ Dynamic::Dynamic(Score* s)
+    : TextBase(s, Tid::DYNAMICS, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+       {
+-      initElementStyle(&dynamicsStyle);
+       _velocity    = -1;
+       _dynRange    = Range::PART;
+       _dynamicType = Type::OTHER;
+       _changeInVelocity = 128;
+       _velChangeSpeed = Speed::NORMAL;
++      initElementStyle(&dynamicsStyle);
+       }
+ 
+ Dynamic::Dynamic(const Dynamic& d)
+--- a/libmscore/fermata.cpp
++++ b/libmscore/fermata.cpp
+@@ -41,11 +41,11 @@ static const ElementStyle fermataStyle {
+ Fermata::Fermata(Score* s)
+    : Element(s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+       {
+-      initElementStyle(&fermataStyle);
+       setPlacement(Placement::ABOVE);
+       _symId         = SymId::noSym;
+       _timeStretch   = 1.0;
+       setPlay(true);
++      initElementStyle(&fermataStyle);
+       }
+ 
+ Fermata::Fermata(SymId id, Score* s)
+--- a/libmscore/textline.cpp
++++ b/libmscore/textline.cpp
+@@ -66,8 +66,6 @@ void TextLineSegment::layout()
+ TextLine::TextLine(Score* s)
+    : TextLineBase(s)
+       {
+-      initElementStyle(&textLineStyle);
+-
+       setBeginText("");
+       setContinueText("");
+       setEndText("");
+@@ -81,6 +79,8 @@ TextLine::TextLine(Score* s)
+       setBeginHookHeight(Spatium(1.5));
+       setEndHookHeight(Spatium(1.5));
+ 
++      initElementStyle(&textLineStyle);
++
+       resetProperty(Pid::BEGIN_TEXT_PLACE);
+       resetProperty(Pid::CONTINUE_TEXT_PLACE);
+       resetProperty(Pid::END_TEXT_PLACE);

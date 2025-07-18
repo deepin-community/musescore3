@@ -1,0 +1,46 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: Hans Petter Selasky <hps@selasky.org>
+Description: Fix GH#10407: ALSA sequencer device leaks when toggling MIDI ON/OFF
+
+--- a/mscore/alsa.cpp
++++ b/mscore/alsa.cpp
+@@ -617,6 +617,7 @@ AlsaAudio::~AlsaAudio()
+       {
+       stop();
+       delete alsa;
++      delete midiDriver;
+       }
+ 
+ //---------------------------------------------------------
+--- a/mscore/alsamidi.h
++++ b/mscore/alsamidi.h
+@@ -47,7 +47,7 @@ class AlsaMidiDriver : public MidiDriver
+ 
+    public:
+       AlsaMidiDriver(Seq* s);
+-      virtual ~AlsaMidiDriver() {}
++      ~AlsaMidiDriver();
+       virtual bool init();
+       virtual Port registerOutPort(const QString& name);
+       virtual Port registerInPort(const QString& name);
+--- a/mscore/mididriver.cpp
++++ b/mscore/mididriver.cpp
+@@ -131,10 +131,16 @@ static const unsigned int outCap = SND_S
+ //---------------------------------------------------------
+ 
+ AlsaMidiDriver::AlsaMidiDriver(Seq* s)
+-   : MidiDriver(s)
++   : MidiDriver(s), alsaSeq(0)
+       {
+       }
+ 
++AlsaMidiDriver::~AlsaMidiDriver()
++      {
++      if (alsaSeq)
++            snd_seq_close(alsaSeq);
++      }
++
+ //---------------------------------------------------------
+ //   init
+ //    return false on error

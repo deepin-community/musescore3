@@ -1,0 +1,428 @@
+Description: Fix multiple possible causes of crashes or audible artefacts
+ - Track sample name so we can issue proper warning messages, show filename
+ - On read errors, issue an error message and mark sample as invalid
+ - Mark sample as invalid if Ogg Vorbis decompression (SF3) fails
+ - Do all sanity checks on {,loop}{start,end} with SF2 semantics for end;
+   only switch end to point to the last sample afterwards in only one place
+ - Adapt sanity checks and corrections to current FluidSynth, which matches
+   real-existing soundfonts better
+ - Add sanity check provided by the SoundFont spec as extra diagnostic
+ - Do not crash if there is no data[]
+ - Issue diagnostics if disabling a sample
+ - Swap two members to improve structure packing/alignment while there
+ - Use unsigned integers for SoundFont element sizes properly
+Author: mirabilos <m@mirbsd.org>
+Bug: https://musescore.org/en/node/89216 (and probably others)
+Bug-Debian: https://bugs.debian.org/985129
+Forwarded: https://github.com/musescore/MuseScore/pull/7728
+
+--- a/fluid/sfont.cpp
++++ b/fluid/sfont.cpp
+@@ -610,6 +610,7 @@ Sample::Sample(SFont* s)
+       data        = 0;
+       amplitude_that_reaches_noise_floor_is_valid = false;
+       amplitude_that_reaches_noise_floor = 0.0;
++      name[0]     = 0;
+       }
+ 
+ //---------------------------------------------------------
+@@ -647,18 +648,22 @@ void Sample::load()
+             std::vector<char> p;
+             p.resize(size);
+             if (fd.read(p.data(), size) != size) {
+-                  qDebug("read %d failed", size);
++                  qWarning("SoundFont(%s) Sample(%s) read %u bytes failed", qPrintable(sf->get_name()), name, size);
++                  setValid(false);
+                   return;
+                   }
+-            decompressOggVorbis(p.data(), size);
++            setValid(decompressOggVorbis(p.data(), size));
+ #endif
+             }
+       else {
+             data = new short[size];
+             size *= sizeof(short);
+ 
+-            if (fd.read((char*)data, size) != size)
++            if (fd.read((char*)data, size) != size) {
++                  qWarning("SoundFont(%s) Sample(%s) read %u bytes failed", qPrintable(sf->get_name()), name, size);
++                  setValid(false);
+                   return;
++                  }
+ 
+             if (QSysInfo::ByteOrder == QSysInfo::BigEndian) {
+                   unsigned char hi, lo;
+@@ -672,11 +677,34 @@ void Sample::load()
+                         data[i] = s;
+                         }
+                   }
+-            end       -= (start + 1);       // marks last sample, contrary to SF spec.
++            end       -= start;
+             loopstart -= start;
+             loopend   -= start;
+             start      = 0;
+             }
++
++      // sanity checks:
++      // - start < end in SFont::load_shdr(int)
++      // - start < loopstart < loopend < end for !SF3 ibidem
++      // - … for SF3 in Sample::decompressOggVorbis(char *, unsigned int) in sfont3.cpp
++      // - most importantly, they are done *before* start is normalised to 0, which it is at this point
++      //
++      // now add some extra sanity checks from the SF2 spec (biased so they work with unsigned int);
++      // just a warning, they probably work with Fluid, possibly with audible artefacts though...
++      if (!(start + 7 < loopstart) || !(loopstart + 31 < loopend) || !(loopend + 7 < end))
++            qDebug("SoundFont(%s) Sample(%s) start(%u) startloop(%u) endloop(%u) end(%u) smaller than SoundFont 2.04 spec chapter 7.10 recommendation",
++                     qPrintable(sf->get_name()), name, start, loopstart, loopend, end);
++
++      // this used to cause a crash
++      if (!data) {
++            qWarning("SoundFont(%s) Sample(%s) data is nil", qPrintable(sf->get_name()), name);
++            setValid(false);
++            }
++
++      // from here, end marks the last sample, not one past as in the SF2 spec
++      if (end > 0)
++            end -= 1;
++
+       optimize();
+       }
+ 
+@@ -745,6 +773,8 @@ bool SFont::load()
+             }
+       SFChunk chunk;
+ 
++      // so that any subsequent errors can be attributed to the right file
++      qInfo("Loading soundfont: %s", qPrintable(f.fileName()));
+       try {
+             readchunk(&chunk);
+             if (chunkid(chunk.id) != RIFF_ID)
+@@ -1624,9 +1654,7 @@ void SFont::load_shdr (int size)
+       for (int i = 0; i < size; i++) {
+             Sample* p = new Sample(this);
+             sample.append(p);
+-            char buffer[21];
+-            READSTR (buffer);
+-            // READSTR (p->name);
++            READSTR (p->name);
+             READD (p->start);
+             READD (p->end);	      /* - end, loopstart and loopend */
+             READD (p->loopstart);	/* - will be checked and turned into */
+@@ -1641,28 +1669,47 @@ void SFont::load_shdr (int size)
+                   continue;
+                   }
+             if ((p->end > getSamplesize()) || (p->start > (p->end - 4))) {
+-                  qWarning("Sample start/end file positions are invalid, disabling");
++                  qWarning("Sample(%s) start/end file positions are invalid, disabling", p->name);
+                   p->setValid(false);
+                   continue;
+                   }
+             p->setValid(true);
+             if (p->sampletype & FLUID_SAMPLETYPE_OGG_VORBIS) {
++                  // done in Sample::decompressOggVorbis in sfont3.cpp
+                   }
+             else {
+-                  // loop is fowled?? (cluck cluck :)
+-                  if (p->loopend > p->end || p->loopstart >= p->loopend || p->loopstart <= p->start) {
+-                        /* can pad loop by 8 samples and ensure at least 4 for loop (2*8+4) */
+-                        if ((p->end - p->start) >= 20) {
+-                              p->loopstart = p->start + 8;
+-                              p->loopend   = p->end - 8;
+-                              }
+-                        else {      // loop is fowled, sample is tiny (can't pad 8 samples)
+-                              p->loopstart = p->start + 1;
+-                              p->loopend   = p->end - 1;
+-                              }
++                  // try to fixup start<loopstart<loopend<end similar to recent FluidSynth;
++                  // some of these are technically invalid but exist in the field; see the
++                  // SoundFont 2.04 spec-related diagnostic about this in sfont.cpp
++                  if (p->loopstart == p->loopend) {
++                        // normalise to ensure they are within the sample, even non-looped
++                        p->loopstart = p->loopend = p->start;
+                         }
+-                  if ((p->end - p->start) < 8)
++                  else if (p->loopstart > p->loopend) {
++                        unsigned int looptmp;
++
++                        qWarning("Sample(%s) swapping reversed loopstart<=>loopend",
++                                 p->name);
++                        looptmp = p->loopstart;
++                        p->loopstart = p->loopend;
++                        p->loopend = looptmp;
++                        }
++                  // ensure they are at least within the sample
++                  if (p->loopstart < p->start || p->loopstart > p->end) {
++                        qWarning("Sample(%s) loopstart(%u) out of bounds [start=%u end=%u], setting to start",
++                                 p->name, p->loopstart, p->start, p->end);
++                        p->loopstart = p->start;
++                        }
++                  if (p->loopend < p->start || p->loopend > p->end) {
++                        qWarning("Sample(%s) loopend(%u) out of bounds [start=%u end=%u], setting to end",
++                                 p->name, p->loopend, p->start, p->end);
++                        p->loopstart = p->end;
++                        }
++                  // ensure it can even play
++                  if ((p->end - p->start) < 8) {
++                        qWarning("Sample(%s) too small, disabling", p->name);
+                         p->setValid(false);
++                        }
+                   }
+             }
+       FSKIP (SFSHDRSIZE);	/* skip terminal shdr */
+--- a/fluid/sfont.h
++++ b/fluid/sfont.h
+@@ -150,8 +150,10 @@ class Sample {
+           filled out automatically */
+       /* Set this to zero, when submitting a new sample. */
+ 
+-      bool amplitude_that_reaches_noise_floor_is_valid;
+       double amplitude_that_reaches_noise_floor;
++      bool amplitude_that_reaches_noise_floor_is_valid;
++
++      char name[21];
+ 
+       Sample(SFont*);
+       ~Sample();
+@@ -162,7 +164,7 @@ class Sample {
+       bool valid() const    { return _valid; }
+       void setValid(bool v) { _valid = v; }
+ #ifdef SOUNDFONT3
+-      bool decompressOggVorbis(char* p, int size);
++      bool decompressOggVorbis(char* p, unsigned int size);
+ #endif
+       };
+ 
+--- a/fluid/sfont3.cpp
++++ b/fluid/sfont3.cpp
+@@ -10,7 +10,7 @@ namespace FluidS {
+ //   decompressOggVorbis
+ //---------------------------------------------------------
+ 
+-bool Sample::decompressOggVorbis(char* src, int size)
++bool Sample::decompressOggVorbis(char* src, unsigned int size)
+       {
+       AudioFile af;
+       QByteArray ba(src, size);
+@@ -18,32 +18,51 @@ bool Sample::decompressOggVorbis(char* s
+       start = 0;
+       end   = 0;
+       if (!af.open(ba)) {
+-            qDebug("Sample::decompressOggVorbis: open failed: %s", af.error());
++            qWarning("SoundFont(%s) Sample(%s) decompressOggVorbis: open failed: %s", qPrintable(sf->get_name()), name, af.error());
+             return false;
+             }
+-      int frames = af.frames();
++      unsigned int frames = af.frames();
+       data = new short[frames * af.channels()];
+-      if (frames != af.readData(data, frames)) {
+-            qDebug("Sample read failed: %s", af.error());
++      if (frames != (unsigned int)af.readData(data, frames)) {
++            qWarning("SoundFont(%s) Sample(%s) read failed: %s", qPrintable(sf->get_name()), name, af.error());
+             delete[] data;
+             data = 0;
++            return false;
++            }
++      // cf. https://musescore.org/en/node/89216#comment-1068379 and following
++      end = frames;
++
++      // try to fixup start<loopstart<loopend<end similar to recent FluidSynth;
++      // some of these are technically invalid but exist in the field; see the
++      // SoundFont 2.04 spec-related diagnostic about this in sfont.cpp
++      if (loopstart == loopend) {
++            // normalise to ensure they are within the sample, even non-looped
++            loopstart = loopend = start;
+             }
+-      end = frames - 1;
++      else if (loopstart > loopend) {
++            unsigned int looptmp;
+ 
+-      if (loopend > end ||loopstart >= loopend || loopstart <= start) {
+-            /* can pad loop by 8 samples and ensure at least 4 for loop (2*8+4) */
+-            if ((end - start) >= 20) {
+-                  loopstart = start + 8;
+-                  loopend = end - 8;
+-                  }
+-            else { // loop is fowled, sample is tiny (can't pad 8 samples)
+-                  loopstart = start + 1;
+-                  loopend = end - 1;
+-                  }
++            qWarning("SoundFont(%s) Sample(%s) swapping reversed loopstart<=>loopend",
++                     qPrintable(sf->get_name()), name);
++            looptmp = loopstart;
++            loopstart = loopend;
++            loopend = looptmp;
+             }
++      // ensure they are at least within the sample
++      if (loopstart < start || loopstart > end) {
++            qWarning("SoundFont(%s) Sample(%s) loopstart(%u) out of bounds [start=%u end=%u], setting to start",
++                     qPrintable(sf->get_name()), name, loopstart, start, end);
++            loopstart = start;
++            }
++      if (loopend < start || loopend > end) {
++            qWarning("SoundFont(%s) Sample(%s) loopend(%u) out of bounds [start=%u end=%u], setting to end",
++                     qPrintable(sf->get_name()), name, loopend, start, end);
++            loopstart = end;
++            }
++      // ensure it can even play
+       if ((end - start) < 8) {
+-            qDebug("invalid sample");
+-            setValid(false);
++            qWarning("SoundFont(%s) Sample(%s) too small, disabling", qPrintable(sf->get_name()), name);
++            return false;
+             }
+ 
+       return true;
+--- a/fluid/voice.cpp
++++ b/fluid/voice.cpp
+@@ -1181,8 +1181,8 @@ void Voice::update_param(int _gen)
+             case GEN_STARTADDRCOARSEOFS:        /* SF2.01 section 8.1.3 # 4 */
+                   if (sample != 0) {
+                         start = (sample->start
+-			         + (int) GEN(GEN_STARTADDROFS)
+-			         + 32768 * (int) GEN(GEN_STARTADDRCOARSEOFS));
++			         + (unsigned int) GEN(GEN_STARTADDROFS)
++			         + 32768U * (unsigned int) GEN(GEN_STARTADDRCOARSEOFS));
+                         check_sample_sanity_flag = FLUID_SAMPLESANITY_CHECK;
+                         }
+                   break;
+@@ -1191,8 +1191,8 @@ void Voice::update_param(int _gen)
+             case GEN_ENDADDRCOARSEOFS:           /* SF2.01 section 8.1.3 # 12 */
+                   if (sample != 0) {
+                         end = (sample->end
+-			         + (int) GEN(GEN_ENDADDROFS)
+-			         + 32768 * (int) GEN(GEN_ENDADDRCOARSEOFS));
++			         + (unsigned int) GEN(GEN_ENDADDROFS)
++			         + 32768U * (unsigned int) GEN(GEN_ENDADDRCOARSEOFS));
+                         check_sample_sanity_flag = FLUID_SAMPLESANITY_CHECK;
+                         }
+                   break;
+@@ -1201,8 +1201,8 @@ void Voice::update_param(int _gen)
+             case GEN_STARTLOOPADDRCOARSEOFS:     /* SF2.01 section 8.1.3 # 45 */
+                   if (sample != 0) {
+                         loopstart = (sample->loopstart
+-				  + (int) GEN(GEN_STARTLOOPADDROFS)
+-				  + 32768 * (int) GEN(GEN_STARTLOOPADDRCOARSEOFS));
++				  + (unsigned int) GEN(GEN_STARTLOOPADDROFS)
++				  + 32768U * (unsigned int) GEN(GEN_STARTLOOPADDRCOARSEOFS));
+                         check_sample_sanity_flag = FLUID_SAMPLESANITY_CHECK;
+                         }
+                   break;
+@@ -1211,8 +1211,8 @@ void Voice::update_param(int _gen)
+             case GEN_ENDLOOPADDRCOARSEOFS:       /* SF2.01 section 8.1.3 # 50 */
+                   if (sample != 0) {
+                         loopend = (sample->loopend
+-				   + (int) GEN(GEN_ENDLOOPADDROFS)
+-				   + 32768 * (int) GEN(GEN_ENDLOOPADDRCOARSEOFS));
++				   + (unsigned int) GEN(GEN_ENDLOOPADDROFS)
++				   + 32768U * (unsigned int) GEN(GEN_ENDLOOPADDRCOARSEOFS));
+                         check_sample_sanity_flag = FLUID_SAMPLESANITY_CHECK;
+                         }
+                   break;
+@@ -1656,22 +1656,22 @@ float Voice::get_lower_boundary_for_atte
+  */
+ void Voice::check_sample_sanity()
+       {
+-      int min_index_nonloop=(int) sample->start;
+-      int max_index_nonloop=(int) sample->end;
++      unsigned int min_index_nonloop = sample->start;
++      unsigned int max_index_nonloop = sample->end;
+ 
+       /* make sure we have enough samples surrounding the loop */
+-      int min_index_loop=(int) sample->start + FLUID_MIN_LOOP_PAD;
+-      int max_index_loop=(int) sample->end - FLUID_MIN_LOOP_PAD;
++      unsigned int min_index_loop = sample->start + FLUID_MIN_LOOP_PAD;
++      unsigned int max_index_loop = sample->end - FLUID_MIN_LOOP_PAD;
+       fluid_check_fpe("voice_check_sample_sanity start");
+ 
+       if (!check_sample_sanity_flag)
+ 	      return;
+ 
+ #if 0
+-printf("Sample from %i to %i\n", sample->start, sample->end);
+-printf("Sample loop from %i %i\n", sample->loopstart, sample->loopend);
+-printf("Playback from %i to %i\n", start, end);
+-printf("Playback loop from %i to %i\n", loopstart, loopend);
++printf("Sample from %u to %u\n", sample->start, sample->end);
++printf("Sample loop from %u to %u\n", sample->loopstart, sample->loopend);
++printf("Playback from %u to %u\n", start, end);
++printf("Playback loop from %u to %u\n", loopstart, loopend);
+ #endif
+ 
+       /* Keep the start point within the sample data */
+@@ -1688,7 +1688,7 @@ printf("Playback loop from %i to %i\n",
+ 
+       /* Keep start and end point in the right order */
+       if (start > end) {
+-            int temp = start;
++            unsigned int temp = start;
+             start    = end;
+             end      = temp;
+             }
+@@ -1714,7 +1714,7 @@ printf("Playback loop from %i to %i\n",
+ 
+             /* Keep loop start and end point in the right order */
+             if (loopstart > loopend){
+-	            int temp  = loopstart;
++	            unsigned int temp  = loopstart;
+ 	            loopstart = loopend;
+ 	            loopend   = temp;
+                   }
+@@ -1726,7 +1726,7 @@ printf("Playback loop from %i to %i\n",
+             /* The loop points may have changed. Obtain a new estimate for the loop volume. */
+             /* Is the voice loop within the sample loop?
+              */
+-            if ((int)loopstart >= (int)sample->loopstart && (int)loopend <= (int)sample->loopend){
++            if (loopstart >= sample->loopstart && loopend <= sample->loopend){
+ 	            /* Is there a valid peak amplitude available for the loop? */
+ 	            if (sample->amplitude_that_reaches_noise_floor_is_valid) {
+ 	                  amplitude_that_reaches_noise_floor_loop = sample->amplitude_that_reaches_noise_floor;
+@@ -1765,13 +1765,13 @@ printf("Playback loop from %i to %i\n",
+             * the sample, enter the loop and proceed as expected => no
+             * actions required.
+             */
+-            int index_in_sample = phase.index();
++            unsigned int index_in_sample = (unsigned int)phase.index();
+             if (index_in_sample >= loopend) {
+      	            /* FLUID_LOG(FLUID_DBG, "Loop / sample sanity check: Phase after 2nd loop point!"); */
+      	            phase.setInt(loopstart);
+                   }
+             }
+-/*    FLUID_LOG(FLUID_DBG, "Loop / sample sanity check: Sample from %i to %i, loop from %i to %i", voice->start, voice->end, voice->loopstart, voice->loopend); */
++/*    FLUID_LOG(FLUID_DBG, "Loop / sample sanity check: Sample from %u to %u, loop from %u to %u", voice->start, voice->end, voice->loopstart, voice->loopend); */
+ 
+     /* Sample sanity has been assured. Don't check again, until some
+        sample parameter is changed by modulation.
+@@ -1815,7 +1815,6 @@ void Sample::optimize()
+       signed short peak;
+       float normalized_amplitude_during_loop;
+       double result;
+-      int i;
+ 
+       /* ignore ROM and other(?) invalid samples */
+       if (!s->valid())
+@@ -1823,7 +1822,7 @@ void Sample::optimize()
+ 
+       if (!s->amplitude_that_reaches_noise_floor_is_valid) { /* Only once */
+             /* Scan the loop */
+-            for (i = (int)s->loopstart; i < (int) s->loopend; i ++) {
++            for (size_t i = s->loopstart; i < s->loopend; i++) {
+                   signed short val = s->data[i];
+                   if (val > peak_max)
+                         peak_max = val;
+--- a/fluid/voice.h
++++ b/fluid/voice.h
+@@ -134,10 +134,10 @@ public:
+ 	float root_pitch, root_pitch_hz;
+ 
+ 	/* sample and loop start and end points (offset in sample memory).  */
+-	int start;
+-	int end;
+-	int loopstart;
+-	int loopend;
++	unsigned int start;
++	unsigned int end;
++	unsigned int loopstart;
++	unsigned int loopend;
+ 
+ 	/* vol env */
+ 	fluid_env_data_t volenv_data[FLUID_VOICE_ENVLAST];

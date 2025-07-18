@@ -1,0 +1,174 @@
+Origin: upstream, commit:406b7b6bf23de8248f77015b8c38ec6d876c04cd
+Author: J. Edward Sanchez <Spire42@users.noreply.github.com>
+Description: Fix #304466: The “I/O” tab of the “Preferences” dialog should use radio buttons instead of checkboxes
+ Fixed a UI problem with the “I/O” tab of the “Preferences” dialog that
+ caused mutually exclusive options to be presented to the user as
+ checkboxes instead of radio buttons.
+ .
+ The underlying technical reason for this was that the Qt framework does
+ not allow group boxes to have radio buttons. This has been worked
+ around by subclassing the QGroupBox class and rendering the checkboxes
+ to look like radio buttons. This is sufficient for our purposes because
+ the application already overrides the checkboxes' behavior to work like
+ radio buttons.
+
+--- a/mscore/CMakeLists.txt
++++ b/mscore/CMakeLists.txt
+@@ -332,6 +332,7 @@ add_executable ( ${ExecutableName}
+       pathlistdialog.h piano.h pianolevels.h pianolevelschooser.h  pianolevelsfilter.h
+       pianokeyboard.h pianoroll.h pianoruler.h pianotools.h pianoview.h
+       playpanel.h pm.h preferences.h preferenceslistwidget.h prefsdialog.h
++      radiobuttongroupbox.h
+       recordbutton.h resourceManager.h revision.h ruler.h scoreaccessibility.h
+       scoreBrowser.h scoreInfo.h scorePreview.h scoretab.h scoreview.h searchComboBox.h
+       sectionbreakprop.h selectdialog.h selectionwindow.h selectnotedialog.h selinstrument.h
+@@ -357,6 +358,7 @@ add_executable ( ${ExecutableName}
+       preferences.cpp measureproperties.cpp
+       seq.cpp textpalette.cpp
+       timedialog.cpp symboldialog.cpp shortcutcapturedialog.cpp
++      radiobuttongroupbox.cpp
+       simplebutton.cpp musedata.cpp
+       editdrumset.cpp editstaff.cpp
+       timesigproperties.cpp newwizard.cpp transposedialog.cpp
+--- a/mscore/prefsdialog.ui
++++ b/mscore/prefsdialog.ui
+@@ -2659,7 +2659,7 @@
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_8">
+        <item>
+-        <widget class="QGroupBox" name="pulseaudioDriver">
++        <widget class="Ms::RadioButtonGroupBox" name="pulseaudioDriver">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+@@ -2684,7 +2684,7 @@
+         </widget>
+        </item>
+        <item>
+-        <widget class="QGroupBox" name="portaudioDriver">
++        <widget class="Ms::RadioButtonGroupBox" name="portaudioDriver">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+@@ -2864,7 +2864,7 @@ Adjusting latency can help synchronize y
+         </widget>
+        </item>
+        <item>
+-        <widget class="QGroupBox" name="alsaDriver">
++        <widget class="Ms::RadioButtonGroupBox" name="alsaDriver">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+@@ -3080,7 +3080,7 @@ Adjusting latency can help synchronize y
+         </widget>
+        </item>
+        <item>
+-        <widget class="QGroupBox" name="jackDriver">
++        <widget class="Ms::RadioButtonGroupBox" name="jackDriver">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+@@ -4161,6 +4161,11 @@ Adjusting latency can help synchronize y
+    <extends>QToolButton</extends>
+    <header>recordbutton.h</header>
+   </customwidget>
++  <customwidget>
++   <class>Ms::RadioButtonGroupBox</class>
++   <extends>QGroupBox</extends>
++   <header>radiobuttongroupbox.h</header>
++  </customwidget>
+  </customwidgets>
+  <tabstops>
+   <tabstop>General</tabstop>
+--- /dev/null
++++ b/mscore/radiobuttongroupbox.cpp
+@@ -0,0 +1,49 @@
++//=============================================================================
++//  MuseScore
++//  Music Composition & Notation
++//
++//  Copyright (C) 2020 MuseScore BVBA and others
++//
++//  This program is free software; you can redistribute it and/or modify
++//  it under the terms of the GNU General Public License version 2.
++//
++//  This program is distributed in the hope that it will be useful,
++//  but WITHOUT ANY WARRANTY; without even the implied warranty of
++//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++//  GNU General Public License for more details.
++//
++//  You should have received a copy of the GNU General Public License
++//  along with this program; if not, write to the Free Software
++//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++//=============================================================================
++
++#include "radiobuttongroupbox.h"
++
++namespace Ms {
++
++void RadioButtonGroupBox::paintEvent(QPaintEvent*)
++      {
++      QStylePainter painter(this);
++      QStyleOptionGroupBox styleOption;
++      initStyleOption(&styleOption);
++
++      // Paint the default QGroupBox-style control, which includes an unwanted checkbox that we'll cover up afterwards.
++      painter.drawComplexControl(QStyle::CC_GroupBox, styleOption);
++
++      // Calculate the background color the same way Qt does in QFusionStylePrivate::tabFrameColor().
++      const QColor& buttonColor = styleOption.palette.button().color();
++      QColor bgColor = buttonColor.lighter(100 + std::max(1, (180 - qGray(buttonColor.rgb())) / 6));
++      bgColor.setHsv(bgColor.hue(), 3 * bgColor.saturation() / 4, bgColor.value());
++      bgColor = bgColor.lighter(104);
++
++      // Adjust the style options to use the checkbox's rectangle.
++      styleOption.rect = style()->subControlRect(QStyle::CC_GroupBox, &styleOption, QStyle::SC_GroupBoxCheckBox, this);
++
++      // Cover up the checkbox, making sure to enlarge the rectangle a bit to cover up any anti-aliasing around the edges.
++      painter.fillRect(styleOption.rect.adjusted(-2, -2, 2, 2), bgColor);
++
++      // Paint the radio button.
++      painter.drawPrimitive(QStyle::PE_IndicatorRadioButton, styleOption);
++      }
++
++}
+--- /dev/null
++++ b/mscore/radiobuttongroupbox.h
+@@ -0,0 +1,37 @@
++//=============================================================================
++//  MuseScore
++//  Music Composition & Notation
++//
++//  Copyright (C) 2020 MuseScore BVBA and others
++//
++//  This program is free software; you can redistribute it and/or modify
++//  it under the terms of the GNU General Public License version 2.
++//
++//  This program is distributed in the hope that it will be useful,
++//  but WITHOUT ANY WARRANTY; without even the implied warranty of
++//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++//  GNU General Public License for more details.
++//
++//  You should have received a copy of the GNU General Public License
++//  along with this program; if not, write to the Free Software
++//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++//=============================================================================
++
++#ifndef RADIOBUTTONGROUPBOX_H
++#define RADIOBUTTONGROUPBOX_H
++
++namespace Ms {
++
++class RadioButtonGroupBox : public QGroupBox {
++      Q_OBJECT
++
++      void paintEvent(QPaintEvent* event) override;
++
++   public:
++      explicit RadioButtonGroupBox(QWidget* parent = nullptr) : QGroupBox(parent) { }
++      explicit RadioButtonGroupBox(const QString& title, QWidget* parent = nullptr) : QGroupBox(title, parent) { }
++      };
++
++}
++
++#endif

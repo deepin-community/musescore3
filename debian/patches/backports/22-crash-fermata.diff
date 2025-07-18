@@ -1,0 +1,16 @@
+Origin: upstream, commit:5925ea19adf87b32ea6c4967df6de00ec2bfd23f
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #294156: Incorrect segment type for fermata
+
+--- a/libmscore/measure.cpp
++++ b/libmscore/measure.cpp
+@@ -2394,7 +2394,8 @@ void Measure::readVoice(XmlReader& e, in
+                   }
+             }
+       if (fermata) {
+-            segment = getSegment(SegmentType::EndBarLine, e.tick());
++            SegmentType st = (e.tick() == endTick() ? SegmentType::EndBarLine : SegmentType::ChordRest);
++            segment = getSegment(st, e.tick());
+             segment->add(fermata);
+             fermata = nullptr;
+             }

@@ -1,0 +1,41 @@
+Origin: upstream, commit:c1365329758d18f6f71583059c007ff31d6b1f7c
+Author: Peter Hieu Vu <peter.vu8@gmail.com>
+Description: fix #288618: play property for articulations
+
+--- a/libmscore/rendermidi.cpp
++++ b/libmscore/rendermidi.cpp
+@@ -511,8 +511,10 @@ static void collectMeasureEventsSimple(E
+                   int channel = instr->channel(chord->upNote()->subchannel())->channel();
+                   events->registerChannel(channel);
+ 
+-                  for (Articulation* a : chord->articulations())
+-                        instr->updateVelocity(&velocity,channel, a->articulationName());
++                  for (Articulation* a : chord->articulations()) {
++                        if (a->playArticulation())
++                              instr->updateVelocity(&velocity,channel, a->articulationName());
++                        }
+ 
+                   if ( !graceNotesMerged(chord))
+                       for (Chord* c : chord->graceNotesBefore())
+@@ -883,6 +885,8 @@ static void collectMeasureEventsDefault(
+                         if (singleNoteDynamics || hasArticulations || hasChangingDynamic) {
+                               if (chord != 0 && hasArticulations) {
+                                     for (Articulation* a : chord->articulations()) {
++                                          if (!a->playArticulation())
++                                                continue;
+                                           if (velocityMiddle == -1)
+                                                 velocityMiddle = velocityStart;
+                                           instr->updateVelocity(&velocityStart, channel, a->articulationName());
+@@ -943,8 +947,10 @@ static void collectMeasureEventsDefault(
+                         } // if instr->singleNoteDynamics()
+                   else {
+                         if (chord != 0) {
+-                              for (Articulation* a : chord->articulations())
+-                                    instr->updateVelocity(&velocity, channel, a->articulationName());
++                              for (Articulation* a : chord->articulations()) {
++                                    if (a->playArticulation())
++                                          instr->updateVelocity(&velocity, channel, a->articulationName());
++                                    }
+                               }
+                         // Add a single expression value to match the velocity, since this instrument should
+                         // not use single note dynamics.

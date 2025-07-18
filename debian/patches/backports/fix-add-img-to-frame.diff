@@ -1,0 +1,20 @@
+Origin: upstream, commit:8a19c1532dd1847fd77b3b9dd9f9d9562f9baa25
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #307720: assertion failure adding image to vertical frame
+ .
+ Resolves: https://musescore.org/en/node/307720
+ .
+ we are tryng to cast an element to an HBox that isn't necessarily one.
+ No reason to do this; it works just fine without the cast.
+
+--- a/mscore/propertymenu.cpp
++++ b/mscore/propertymenu.cpp
+@@ -311,7 +311,7 @@ void ScoreView::elementPropertyAction(co
+                   }
+             }
+       else if (cmd == "picture") {
+-            mscore->addImage(score(), static_cast<HBox*>(e));
++            mscore->addImage(score(), e);
+             }
+       else if (cmd == "frame-text") {
+             Text* t = new Text(score(), Tid::FRAME);

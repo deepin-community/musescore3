@@ -1,0 +1,115 @@
+Description: Hopefully fix some more uninitialised accesses
+Author: mirabilos <tg@debian.org>
+Forwarded: not yet, probably needs to be done via a Valgrindathon or so
+
+--- a/awl/styledslider.h
++++ b/awl/styledslider.h
+@@ -34,7 +34,7 @@ class StyledSlider : public QWidget
+ 
+       double _minValue = 0;
+       double _maxValue = 127;
+-      double _value;
++      double _value = 0;
+       double _barThickness = 4;
+       double _margin = 20;
+       int _numMajorTicks = 10;
+@@ -46,7 +46,7 @@ class StyledSlider : public QWidget
+       QColor _hilightColor = QColor(0, 255, 0);
+       QColor _tickColor = QColor(150, 150, 150);
+ 
+-      bool draggingMouse;
++      bool draggingMouse = false;
+       QPoint mouseDownPos;
+       double mouseDownVal;
+ 
+--- a/fluid/fluid.cpp
++++ b/fluid/fluid.cpp
+@@ -66,6 +66,16 @@ static const Mod defaultMod[] = {
+ 
+ static const Mod forcePanMod = { GEN_PAN, 10, FLUID_MOD_CC | FLUID_MOD_LINEAR | FLUID_MOD_BIPOLAR | FLUID_MOD_POSITIVE, 0, 0, 1000.0 };
+ 
++#define initialiseForgottenMembers(sampleRate) do {	\
++	sample_rate = sampleRate;			\
++	sfont_id = 0;					\
++	_state = FLUID_SYNTH_CLEAN;			\
++	noteid = 0;					\
++	for (int i = 0; i < 128; ++i)			\
++		_tuning[i] = i * 100.0;			\
++	_masterTuning = 440.0;				\
++} while (/* CONSTCOND */ 0)
++
+ //---------------------------------------------------------
+ //   Fluid
+ //---------------------------------------------------------
+@@ -73,6 +83,7 @@ static const Mod forcePanMod = { GEN_PAN
+ Fluid::Fluid()
+    : Synthesizer()
+       {
++      initialiseForgottenMembers(44100);
+       }
+ 
+ //---------------------------------------------------------
+@@ -88,14 +99,9 @@ void Fluid::init(float sampleRate)
+             Voice::dsp_float_config();
+             }
+       Synthesizer::init(sampleRate);
+-      sample_rate        = sampleRate;
+-      sfont_id           = 0;
++      initialiseForgottenMembers(sampleRate);
+ 
+       _state       = FLUID_SYNTH_PLAYING; // as soon as the synth is created it starts playing.
+-      noteid      = 0;
+-      for (int i = 0; i < 128; ++i)
+-            _tuning[i] = i * 100.0;
+-      _masterTuning = 440.0;
+ 
+       for (int i = 0; i < 512; i++)
+             freeVoices.append(new Voice(this));
+--- a/fluid/voice.cpp
++++ b/fluid/voice.cpp
+@@ -160,15 +160,25 @@ void Voice::init(Sample* _sample, Channe
+       modenv_count   = 0;
+       modenv_section = 0;
+       modenv_val     = 0.0f;
++      modenv_to_fc   = 0.0f;
++      modenv_to_pitch = 0.0f;
+ 
+       /* mod lfo */
+       modlfo_val = 0.0;       // Fixme: Retrieve from any other existing
+                               // voice on this channel to keep LFOs in
+                               // unison?
++      modlfo_delay = 0;
+       modlfo_pos = 0;
++      modlfo_dur = 0;
++      modlfo_to_fc = 0.0f;
++      modlfo_to_pitch = 0.0f;
++      modlfo_to_vol = 0.0f;
+ 
+       /* vib lfo */
+       viblfo_val = 0.0f;      // Fixme: See mod lfo
++      viblfo_delay = 0;
++      viblfo_incr = 0.0f;
++      viblfo_to_pitch = 0.0f;
+ 
+       /* Clear sample history in filter */
+       hist1 = 0;
+--- a/mscore/scoreview.h
++++ b/mscore/scoreview.h
+@@ -118,7 +118,7 @@ class ScoreView : public QWidget, public
+       // Realtime state:      Note: always set allowRealtimeRests to desired value before starting a timer.
+       QTimer* realtimeTimer;   // multi-shot timer for advancing in automatic realtime mode
+       QTimer* extendNoteTimer; // single-shot timer for initial advancement when a note is held
+-      bool allowRealtimeRests; // Allow entering rests in realtime mode? (See note above)
++      bool allowRealtimeRests = false; // Allow entering rests in realtime mode? (See note above)
+ 
+       bool tripleClickPending = false;
+       bool popupActive = false;
+@@ -413,7 +413,7 @@ class ScoreView : public QWidget, public
+ 
+       virtual const QRect geometry() const override { return QWidget::geometry(); }
+ 
+-      bool clickOffElement;
++      bool clickOffElement = false;
+       void updateGrips();
+       bool moveWhenInactive() const { return _moveWhenInactive; }
+       bool moveWhenInactive(bool move) { bool m = _moveWhenInactive; _moveWhenInactive = move; return m; }

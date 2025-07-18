@@ -1,0 +1,40 @@
+Forwarded: part of Origin PR by Jojo-Schmitz
+Origin: https://github.com/musescore/MuseScore/pull/9000
+Author: iveshenry18 <iveshenry18@gmail.com>
+Description: ENG-58: Fix melisma y position
+ This commit fixes a very subtle error in the y-positioning of melisma
+ lines on lyrics under rests (a rare situation as-is). In short, the
+ equation for the y-position was ignoring the y-position and y-offset of
+ the lyric's chordrest. In normal circumstances (when a lyric is under a
+ chord), this value is 0, so the bug doesn't present itself until one
+ attempts to put melismas under rests (which is hard to do in the first
+ place, but does occur in some XML imports).
+
+--- a/libmscore/lyricsline.cpp
++++ b/libmscore/lyricsline.cpp
+@@ -391,19 +391,19 @@ void LyricsLineSegment::layout()
+ 
+       // VERTICAL POSITION: at the base line of the syllable text
+       if (!isEndType()) {
+-            rypos() = lyr->ipos().y();
+-            ryoffset() = lyr->offset().y();
++            rypos() = lyr->ipos().y() + lyr->chordRest()->ipos().y();
++            ryoffset() = lyr->offset().y() + lyr->chordRest()->offset().y();
+             }
+       else {
+             // use Y position of *next* syllable if there is one on same system
+             Lyrics* nextLyr1 = searchNextLyrics(lyr->segment(), lyr->staffIdx(), lyr->no(), lyr->placement());
+             if (nextLyr1 && nextLyr1->segment()->system() == system()) {
+-                  rypos() = nextLyr1->ipos().y();
+-                  ryoffset() = nextLyr1->offset().y();
++                  rypos() = nextLyr1->ipos().y() + nextLyr1->chordRest()->ipos().y();
++                  ryoffset() = nextLyr1->offset().y() + nextLyr1->chordRest()->offset().y();
+                   }
+             else {
+-                  rypos() = lyr->ipos().y();
+-                  ryoffset() = lyr->offset().y();
++                  rypos() = lyr->ipos().y() + lyr->chordRest()->ipos().y();
++                  ryoffset() = lyr->offset().y() + lyr->chordRest()->offset().y();
+                   }
+             }
+ 

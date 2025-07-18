@@ -1,0 +1,39 @@
+Origin: upstream, commit:443ead70ac77c655095a67bfc0978145fda0c5de
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: Fix #303619: MuseScore crashing when entering font name
+ Resolves: https://musescore.org/en/node/303619.
+ .
+ Passing an empty string to QWidget::setStyleSheet() causes the widget's
+ current style sheet to be removed, thus causing the widget's style to be
+ inherited from its parent. This creates a problem in QComboBox::showPopup(),
+ where it becomes possible that a pointer to a QStyle object could used after
+ the object itself has been destroyed. A style sheet of " " can be used to
+ override any previous style sheet without invalidating the current QStyle
+ object.
+
+--- a/mscore/inspector/inspectorBase.cpp
++++ b/mscore/inspector/inspectorBase.cpp
+@@ -344,7 +344,7 @@ void InspectorBase::checkDifferentValues
+                   if (valuesAreDifferent)
+                         break;
+                   }
+-            ii.w->setStyleSheet(valuesAreDifferent ? QString("* { color: %1 }").arg(c.name()) : "");
++            ii.w->setStyleSheet(valuesAreDifferent ? QString("* { color: %1 }").arg(c.name()) : " ");
+             }
+ 
+       //deal with reset if only one element, or if values are the same
+@@ -359,12 +359,12 @@ void InspectorBase::checkDifferentValues
+                         enableReset = false;
+                         break;
+                   case PropertyFlags::UNSTYLED:
+-                        ii.w->setStyleSheet("");
++                        ii.w->setStyleSheet(" ");
+                         enableReset = true;
+                         break;
+                   case PropertyFlags::NOSTYLE:
+                         enableReset = !isDefault(ii);
+-                        ii.w->setStyleSheet("");
++                        ii.w->setStyleSheet(" ");
+                         break;
+                   }
+             }

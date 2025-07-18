@@ -1,0 +1,23 @@
+Origin: upstream, commit:37ccd37db6f1d40c9a744d8b341b9ac59f2529da
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #300926: Problem selecting and entering a whole note
+ Resolves: https://musescore.org/en/node/300926.
+ .
+ This allows a full measure rest to be changed into a "normal" rest even
+ if the actual length of the rest is not being changed.
+
+--- a/libmscore/cmd.cpp
++++ b/libmscore/cmd.cpp
+@@ -1137,8 +1137,11 @@ void Score::changeCRlen(ChordRest* cr, c
+             return;
+             }
+       Fraction srcF(cr->ticks());
+-      if (srcF == dstF)
++      if (srcF == dstF) {
++            if (cr->isFullMeasureRest())
++                  undoChangeChordRestLen(cr, dstF);
+             return;
++            }
+ 
+       //keep selected element if any
+       Element* selElement = selection().isSingle() ? getSelectedElement() : 0;

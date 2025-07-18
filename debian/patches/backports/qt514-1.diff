@@ -1,0 +1,182 @@
+Origin: upstream, commit:8b9a81e73c2500ead7ef5bfc5b84b0838c792e08
+Author: Jérôme Duval <jerome.duval@gmail.com>
+Description:fix build with Qt5.14
+ .
+ Specializes template routines.
+ Qt 5.14 introduces serialisation/deserialisation for enum classes,
+ this results in ambiguous templates between qdatastream.h and preferences.h.
+ we specialize everything to workaround this.
+ .
+ fix warnings: replace QString::null, with QString()
+
+--- a/mscore/capella.cpp
++++ b/mscore/capella.cpp
+@@ -2708,7 +2708,7 @@ Score::FileError importCapella(MasterSco
+                   QMessageBox::warning(0,
+                      QWidget::tr("Import Capella"),
+                      QWidget::tr("Load failed: %1").arg(cf.error(errNo)),
+-                     QString::null, QWidget::tr("Quit"), QString::null, 0, 1);
++                     QString(), QWidget::tr("Quit"), QString(), 0, 1);
+                   }
+             fp.close();
+             // avoid another error message box
+--- a/mscore/importmidi/importmidi.cpp
++++ b/mscore/importmidi/importmidi.cpp
+@@ -1200,7 +1200,7 @@ Score::FileError importMidi(MasterScore
+                         QMessageBox::warning(0,
+                            QWidget::tr("Load MIDI"),
+                            QWidget::tr("Load failed: %1").arg(errorText),
+-                           QString::null, QWidget::tr("Quit"), QString::null, 0, 1);
++                           QString(), QWidget::tr("Quit"), QString(), 0, 1);
+                         }
+                   fp.close();
+                   qDebug("importMidi: bad file format");
+--- a/mscore/instrdialog.cpp
++++ b/mscore/instrdialog.cpp
+@@ -138,7 +138,7 @@ void InstrumentsDialog::on_loadButton_cl
+             QMessageBox::warning(0,
+                QWidget::tr("Load Style Failed"),
+                QString(strerror(errno)),
+-               QString::null, QWidget::tr("Quit"), QString::null, 0, 1);
++               QString(), QWidget::tr("Quit"), QString(), 0, 1);
+             return;
+             }
+       instrumentsWidget->buildTemplateList();
+--- a/mscore/musescore.cpp
++++ b/mscore/musescore.cpp
+@@ -4022,7 +4022,7 @@ bool MuseScore::readLanguages(const QStr
+                 QMessageBox::warning(0,
+                    QWidget::tr("Load Languages Failed:"),
+                    error,
+-                   QString::null, QWidget::tr("Quit"), QString::null, 0, 1);
++                   QString(), QWidget::tr("Quit"), QString(), 0, 1);
+                 return false;
+                 }
+ 
+@@ -6813,7 +6813,7 @@ bool MuseScore::saveMp3(Score* score, co
+                   QMessageBox::warning(0,
+                                        tr("Encoding Error"),
+                                        tr("Unable to open target file for writing"),
+-                                       QString::null, QString::null);
++                                       QString(), QString());
+                   }
+             return false;
+             }
+@@ -6841,7 +6841,7 @@ bool MuseScore::saveMp3(Score* score, QI
+                   QMessageBox::warning(0,
+                                tr("Error Opening LAME library"),
+                                tr("Could not open MP3 encoding library!"),
+-                               QString::null, QString::null);
++                               QString(), QString());
+             qDebug("Could not open MP3 encoding library!");
+             return false;
+             }
+@@ -6853,7 +6853,7 @@ bool MuseScore::saveMp3(Score* score, QI
+                   QMessageBox::warning(0,
+                                tr("Error Opening LAME library"),
+                                tr("Not a valid or supported MP3 encoding library!"),
+-                               QString::null, QString::null);
++                               QString(), QString());
+             qDebug("Not a valid or supported MP3 encoding library!");
+             return false;
+             }
+@@ -6878,7 +6878,7 @@ bool MuseScore::saveMp3(Score* score, QI
+             if (!MScore::noGui) {
+                   QMessageBox::warning(0, tr("Encoding Error"),
+                      tr("Unable to initialize MP3 stream"),
+-                     QString::null, QString::null);
++                     QString(), QString());
+                   }
+             qDebug("Unable to initialize MP3 stream");
+             MScore::sampleRate = oldSampleRate;
+@@ -7045,7 +7045,7 @@ bool MuseScore::saveMp3(Score* score, QI
+                                     QMessageBox::warning(0,
+                                        tr("Encoding Error"),
+                                        tr("Error %1 returned from MP3 encoder").arg(bytes),
+-                                       QString::null, QString::null);
++                                       QString(), QString());
+                               break;
+                               }
+                         else
+--- a/mscore/musescore.h
++++ b/mscore/musescore.h
+@@ -135,7 +135,7 @@ struct LanguageItem {
+       LanguageItem(const QString k, const QString n) {
+             key = k;
+             name = n;
+-            handbook = QString::null;
++            handbook = QString();
+             }
+       LanguageItem(const QString k, const QString n, const QString h) {
+             key = k;
+--- a/mscore/network/loginmanager.cpp
++++ b/mscore/network/loginmanager.cpp
+@@ -793,7 +793,7 @@ void LoginManager::mediaUploadFinished()
+             QMessageBox::warning(0,
+                      tr("Upload Error"),
+                      tr("Sorry, MuseScore couldn't upload the audio file. Error %1").arg(e),
+-                     QString::null, QString::null);
++                     QString(), QString());
+             }
+       }
+ 
+--- a/mscore/preferences.h
++++ b/mscore/preferences.h
+@@ -372,21 +372,52 @@ extern Preferences preferences;
+ 
+ // Stream operators for enum classes
+ // enum classes don't play well with QSettings without custom serialization
+-template<typename T, typename std::enable_if<std::is_enum<T>::value>::type* = nullptr>
+-inline QDataStream &operator<<(QDataStream &out, const T &val)
++inline QDataStream&
++operator<<(QDataStream &out, const Ms::MuseScoreStyleType &val)
+ {
+     return out << static_cast<int>(val);
+ }
+ 
+-template<typename T, typename std::enable_if<std::is_enum<T>::value>::type* = nullptr>
+-inline QDataStream &operator>>(QDataStream &in, T &val)
++inline QDataStream&
++operator>>(QDataStream &in, Ms::MuseScoreStyleType &val)
+ {
+     int tmp;
+     in >> tmp;
+-    val = static_cast<T>(tmp);
++    val = static_cast<Ms::MuseScoreStyleType>(tmp);
+     return in;
+ }
+ 
++inline QDataStream&
++operator<<(QDataStream &out, const Ms::SessionStart &val)
++{
++    return out << static_cast<int>(val);
++}
++
++inline QDataStream&
++operator>>(QDataStream &in, Ms::SessionStart &val)
++{
++    int tmp;
++    in >> tmp;
++    val = static_cast<Ms::SessionStart>(tmp);
++    return in;
++}
++
++inline QDataStream&
++operator<<(QDataStream &out, const Ms::MusicxmlExportBreaks &val)
++{
++    return out << static_cast<int>(val);
++}
++
++inline QDataStream&
++operator>>(QDataStream &in, Ms::MusicxmlExportBreaks &val)
++{
++    int tmp;
++    in >> tmp;
++    val = static_cast<Ms::MusicxmlExportBreaks>(tmp);
++    return in;
++}
++
++
+ class PreferenceVisitor {
+    public:
+       virtual void visit(QString key, IntPreference*) = 0;

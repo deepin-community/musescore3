@@ -1,0 +1,31 @@
+Origin: upstream, commit:9a8d4fa50ef53a9ba8c62dd1e77978c3cdeef763
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #298188: fix not playing a note if its articulation playback is turned off
+ Complements the fix in c1365329758d18f6f71583059c007ff31d6b1f7c to
+ take "play" property of articulations into account in MIDI rendering.
+ .
+ Also fix a test for this to be actually executed and to cover the
+ case of single-note dynamics MIDI rendering.
+
+--- a/libmscore/rendermidi.cpp
++++ b/libmscore/rendermidi.cpp
+@@ -873,10 +873,16 @@ static void collectMeasureEventsDefault(
+                                     singleNoteDynamics = false;
+                               }
+ 
+-                        // Check for articulations
++                        // Check for articulations to be rendered for playback
+                         bool hasArticulations = false;
+-                        if (chord)
+-                              hasArticulations = chord->articulations().count() > 0;
++                        if (chord) {
++                              for (const Articulation* a : chord->articulations()) {
++                                    if (a->playArticulation()) {
++                                          hasArticulations = true;
++                                          break;
++                                          }
++                                    }
++                              }
+ 
+                         //
+                         // Add CC events

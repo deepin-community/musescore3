@@ -1,0 +1,26 @@
+Origin: upstream, commit:ccb8fe0e020b6772b4c5390e830975cd706cd580
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #293531: clef&key appear on second system after layout with gen clef&key disabled
+ In https://github.com/musescore/MuseScore/pull/4866 I added code
+ to better handle the detection of the end of the layout range.
+ Part of this was to re-establish the header in the first measure after the end of the range.
+ But my code mistakenly passed in lc.firstSystem as the firstSystem parameter.
+ Thus it treated the *second* system as if it was the first,
+ since lc.firstSystem was set based on the system we just completed,
+ not the system we are about to consider.
+ Fix is to calculate when this new system is actually the first system of a section or not.
+ I calculate this the same way lc.firstMeasure itself is calculated.
+
+--- a/libmscore/layout.cpp
++++ b/libmscore/layout.cpp
+@@ -3483,8 +3483,9 @@ System* Score::collectSystem(LayoutConte
+                               if (!s->enabled())
+                                     s->setEnabled(true);
+                               }
++                        bool firstSystem = lc.prevMeasure->sectionBreak() && _layoutMode != LayoutMode::FLOAT;
+                         if (curHeader)
+-                              m->addSystemHeader(lc.firstSystem);
++                              m->addSystemHeader(firstSystem);
+                         else
+                               m->removeSystemHeader();
+                         if (curTrailer)

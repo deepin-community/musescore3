@@ -1,0 +1,170 @@
+Origin: upstream, commit:c2a4051e6dd832ba6d8ff83cd4b3a70c262b944b
+Author: Marc Sabatella <marc@outsideshore.com>
+Description: fix #88861: allow mid-score staff name changes
+
+--- a/mscore/editstaff.cpp
++++ b/mscore/editstaff.cpp
+@@ -43,7 +43,7 @@ namespace Ms {
+ //   EditStaff
+ //---------------------------------------------------------
+ 
+-EditStaff::EditStaff(Staff* s, const Fraction& /*tick*/, QWidget* parent)
++EditStaff::EditStaff(Staff* s, const Fraction& tick, QWidget* parent)
+    : QDialog(parent)
+       {
+       setObjectName("EditStaff");
+@@ -52,7 +52,7 @@ EditStaff::EditStaff(Staff* s, const Fra
+       setModal(true);
+ 
+       staff = nullptr;
+-      setStaff(s);
++      setStaff(s, tick);
+ 
+       MuseScore::restoreGeometry(this);
+ 
+@@ -83,14 +83,14 @@ EditStaff::EditStaff(Staff* s, const Fra
+ //   setStaff
+ //---------------------------------------------------------
+ 
+-void EditStaff::setStaff(Staff* s)
++void EditStaff::setStaff(Staff* s, const Fraction& tick)
+       {
+       if (staff != nullptr)
+             delete staff;
+ 
+       orgStaff = s;
+       Part* part        = orgStaff->part();
+-      instrument        = *part->instrument(/*tick*/);
++      instrument        = *part->instrument(tick);
+       Score* score      = part->score();
+       staff             = new Staff(score);
+       staff->setStaffType(Fraction(0,1), *orgStaff->staffType(Fraction(0,1)));
+@@ -106,20 +106,16 @@ void EditStaff::setStaff(Staff* s)
+       staff->setHideSystemBarLine(orgStaff->hideSystemBarLine());
+ 
+       // get tick range for instrument
+-      auto i = part->instruments()->upper_bound(0);   // tick
++      auto i = part->instruments()->upper_bound(tick.ticks());
+       if (i == part->instruments()->end())
+             _tickEnd = Fraction(-1,1);
+       else
+             _tickEnd = Fraction::fromTicks(i->first);
+-#if 1
+-      _tickStart = Fraction(-1,1);
+-#else
+       --i;
+       if (i == part->instruments()->begin())
+-            _tickStart = 0;
++            _tickStart = Fraction(-1, 1);
+       else
+-            _tickStart = i->first;
+-#endif
++            _tickStart = Fraction::fromTicks(i->first);
+ 
+       // set dlg controls
+       spinExtraDistance->setValue(s->userDist() / score->spatium());
+@@ -254,7 +250,7 @@ void EditStaff::gotoNextStaff()
+       Staff* nextStaff = orgStaff->score()->staff(orgStaff->idx() + 1);
+       if (nextStaff)
+             {
+-            setStaff(nextStaff);
++            setStaff(nextStaff, _tickStart);
+             }
+       }
+ 
+@@ -267,7 +263,7 @@ void EditStaff::gotoPreviousStaff()
+       Staff* prevStaff = orgStaff->score()->staff(orgStaff->idx() - 1);
+       if (prevStaff)
+             {
+-            setStaff(prevStaff);
++            setStaff(prevStaff, _tickStart);
+             }
+       }
+ 
+@@ -350,16 +346,32 @@ void EditStaff::apply()
+ 
+       QString newPartName = partName->text().simplified();
+ 
+-      bool instrumentFieldChanged = !(instrument == *part->instrument());
+-      if (instrumentFieldChanged)
++      bool instrumentFieldChanged = !(instrument == *part->instrument(_tickStart));
++      if (instrumentFieldChanged && _tickStart == Fraction(-1, 1))
+             clefType = instrument.clefType(orgStaff->rstaff());
+ 
+       if (instrumentFieldChanged || part->partName() != newPartName) {
+             // instrument has changed
+             Interval v1 = instrument.transpose();
+-            Interval v2 = part->instrument()->transpose();
++            Interval v2 = part->instrument(_tickStart)->transpose();
+ 
+-            score->undo(new ChangePart(part, new Instrument(instrument), newPartName));
++            if (_tickStart == Fraction(-1, 1)) {
++                  // change instrument and part name globally
++                  score->undo(new ChangePart(part, new Instrument(instrument), newPartName));
++                  }
++            else {
++                  // change part name globally, instrument locally if possible
++                  if (part->partName() != newPartName)
++                        score->undo(new ChangePart(part, new Instrument(*part->instrument()), newPartName));
++                  if (instrumentFieldChanged) {
++                        Segment* s = score->tick2segment(_tickStart, true, SegmentType::ChordRest);
++                        Element* e = s ? s->findAnnotation(ElementType::INSTRUMENT_CHANGE, part->startTrack(), part->endTrack()) : nullptr;
++                        if (e)
++                              score->undo(new ChangeInstrument(toInstrumentChange(e), new Instrument(instrument)));
++                        else
++                              score->undo(new ChangePart(part, new Instrument(instrument), newPartName));
++                        }
++                  }
+             emit instrumentChanged();
+ 
+             if (v1 != v2)
+--- a/mscore/editstaff.h
++++ b/mscore/editstaff.h
+@@ -46,7 +46,7 @@ class EditStaff : public QDialog, privat
+ 
+       virtual void hideEvent(QHideEvent*);
+       void apply();
+-      void setStaff(Staff*);
++      void setStaff(Staff*, const Fraction& tick);
+       void updateInterval(const Interval&);
+       void updateStaffType();
+       void updateInstrument();
+--- a/mscore/propertymenu.cpp
++++ b/mscore/propertymenu.cpp
+@@ -62,6 +62,8 @@
+ #include "libmscore/jump.h"
+ #include "libmscore/marker.h"
+ #include "libmscore/measure.h"
++#include "libmscore/iname.h"
++#include "libmscore/system.h"
+ 
+ namespace Ms {
+ 
+@@ -522,12 +524,21 @@ void ScoreView::elementPropertyAction(co
+ //            editFretDiagram(static_cast<FretDiagram*>(e));
+       else if (cmd == "staff-props") {
+             Fraction tick = {-1,1};
+-            if (e->isChordRest())
+-                  tick = static_cast<ChordRest*>(e)->tick();
+-            else if (e->type() == ElementType::NOTE)
+-                  tick = static_cast<Note*>(e)->chord()->tick();
+-            else if (e->type() == ElementType::MEASURE)
+-                  tick = static_cast<Measure*>(e)->tick();
++            if (e->isChordRest()) {
++                  tick = toChordRest(e)->tick();
++                  }
++            else if (e->isNote()) {
++                  tick = toNote(e)->chord()->tick();
++                  }
++            else if (e->isMeasure()) {
++                  tick = toMeasure(e)->tick();
++                  }
++            else if (e->isInstrumentName()) {
++                  System* system = toSystem(toInstrumentName(e)->parent());
++                  Measure* m = system ? system->firstMeasure() : nullptr;
++                  if (m)
++                        tick = m->tick();
++                  }
+             EditStaff editStaff(e->staff(), tick, 0);
+             connect(&editStaff, SIGNAL(instrumentChanged()), mscore, SLOT(instrumentChanged()));
+             editStaff.exec();

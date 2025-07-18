@@ -1,0 +1,32 @@
+Origin: upstream, commit:9d8d23f87e2045dd9f20dd4a6c078c6454bcb0ad
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #72416: fix onRun() being executed in a wrong instance of dock and dialog plugins
+
+--- a/mscore/plugin/mscorePlugins.cpp
++++ b/mscore/plugin/mscorePlugins.cpp
+@@ -422,11 +422,15 @@ void MuseScore::pluginTriggered(QString
+             delete obj;
+             return;
+             }
+-      p->setFilePath(pp.section('/', 0, -2));
+ 
+       if (p->pluginType() == "dock" || p->pluginType() == "dialog") {
+             QQuickView* view = new QQuickView(engine, 0);
+             view->setSource(QUrl::fromLocalFile(pp));
++            if (QmlPlugin* viewPluginInstance = qobject_cast<QmlPlugin*>(view->rootObject())) {
++                  // a new plugin instance was created by view, use it instead.
++                  delete p;
++                  p = viewPluginInstance;
++                  }
+             view->setTitle(p->menuPath().mid(p->menuPath().lastIndexOf(".") + 1));
+             view->setColor(QApplication::palette().color(QPalette::Window));
+             //p->setParentItem(view->contentItem());
+@@ -455,6 +459,8 @@ void MuseScore::pluginTriggered(QString
+                   }
+             }
+ 
++      p->setFilePath(pp.section('/', 0, -2));
++
+       // don’t call startCmd for non modal dialog
+       if (cs && p->pluginType() != "dock")
+             cs->startCmd();

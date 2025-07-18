@@ -1,0 +1,21 @@
+Origin: upstream, commit:f654f707997610f7de96eeaeadda1ad296034630
+Author: Rory McLeod <mcleodnw@gmail.com>
+Description: fix #285040 crash when changing a triplet's rest's duration
+ - Prevent a null pointer deref when searching a linked tuplet.
+
+--- a/libmscore/edit.cpp
++++ b/libmscore/edit.cpp
+@@ -4743,8 +4743,11 @@ void Score::undoAddCR(ChordRest* cr, Mea
+                                     if (nt == 0)
+                                           qWarning("linked tuplet not found");
+                                     }
+-                              newcr->setTuplet(nt);
+-                              nt->setParent(newcr->measure());
++
++                              if (nt) {
++                                    newcr->setTuplet(nt);
++                                    nt->setParent(newcr->measure());
++                                    }
+                               }
+                         }
+ 

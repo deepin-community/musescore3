@@ -1,0 +1,16 @@
+Origin: upstream, commit:105f81e6b61b020a1e6eb49f2f019db60d9c5363
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #292310: Crash when adjusting Absolute Velocity in piano roll editor
+
+--- a/mscore/pianolevels.cpp
++++ b/mscore/pianolevels.cpp
+@@ -416,7 +416,8 @@ void PianoLevels::adjustLevelLerp(int ti
+             else {
+                   int tick = noteStartTick(note, 0);
+                   if (tick0 <= tick && tick <= tick1) {
+-                        int value = (value1 - value0) * (tick - tick0) / (tick1 - tick0) + value0;
++                        int value = tick0 == tick1 ? value0
++                              : (value1 - value0) * (tick - tick0) / (tick1 - tick0) + value0;
+                         filter->setValue(_staff, note, 0, value);
+                         hitNote = true;
+                         }

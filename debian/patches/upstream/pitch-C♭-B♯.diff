@@ -1,0 +1,21 @@
+Origin: upstream, commit:58d603b499ba6d89455a98af382f4150fc4efd5b
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #290987: B# and Cb octave change
+ Resolves: https://musescore.org/en/node/290987.
+ .
+ Make sure that B#, B##, Cb, and Cbb describe themselves as being in the
+ correct octave. This is accomplished by calculating the octave based on
+ what the pitch would be if there were no accidental. Thus, there is no
+ need to special-case certain tpcs.
+
+--- a/libmscore/note.cpp
++++ b/libmscore/note.cpp
+@@ -760,7 +760,7 @@ int Note::tpc() const
+ QString Note::tpcUserName(bool explicitAccidental) const
+       {
+       QString pitchName = tpc2name(tpc(), NoteSpellingType::STANDARD, NoteCaseType::AUTO, explicitAccidental);
+-      QString octaveName = QString::number(((epitch() + ottaveCapoFret()) / 12) - 1);
++      QString octaveName = QString::number(((epitch() + ottaveCapoFret() - int(tpc2alter(tpc()))) / 12) - 1);
+       return pitchName + (explicitAccidental ? " " : "") + octaveName;
+       }
+ 

@@ -1,0 +1,18 @@
+Description: tone down some debug messages
+ our message handler is a bit loud, hide the
+ Score::removeSpanner not found message unconditionally
+Author: mirabilos <tg@debian.org>
+Forwarded: not-needed
+
+--- a/libmscore/spannermap.cpp
++++ b/libmscore/spannermap.cpp
+@@ -98,7 +98,9 @@ bool SpannerMap::removeSpanner(Spanner*
+                   return true;
+                   }
+             }
++#if 0
+       qDebug("%s (%p) not found", s->name(), s);
++#endif
+       return false;
+       }
+ 

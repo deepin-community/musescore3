@@ -1,0 +1,89 @@
+Origin: upstream, commit:66be5a18fa40a6358b0a78723adcd42f15176fcc
+Author: Niek van den Berg <njvdberg@xs4all.nl>
+Description: fix #293593 - Issues with ottavas
+ Corrects first problem: Status doesn't display the pitch of note that have an
+ ottave line. This is solved in Note::tpcUserName().
+ .
+ Solves the second problem in issue 293593: Accidentals do apply if 8va sign is added.
+ This is solved in Note::updateAccidental(). All calculations are based on the
+ effective pitch of the a note rather than the actual pitch. The solution now
+ takes to ottava signs into account by using the actual pitch.
+ .
+ For easily find out whether an ottava is applied, a new method ottavaCapoFret()
+ is added which returns the pitch offset by an ottava (or capo fret). To prevent
+ code dublication, ppitch() also use this new ottavaCapoFret() method.
+
+--- a/libmscore/note.cpp
++++ b/libmscore/note.cpp
+@@ -760,7 +760,7 @@ int Note::tpc() const
+ QString Note::tpcUserName(bool explicitAccidental) const
+       {
+       QString pitchName = tpc2name(tpc(), NoteSpellingType::STANDARD, NoteCaseType::AUTO, explicitAccidental);
+-      QString octaveName = QString::number((epitch() / 12) - 1);
++      QString octaveName = QString::number(((epitch() + ottaveCapoFret()) / 12) - 1);
+       return pitchName + (explicitAccidental ? " " : "") + octaveName;
+       }
+ 
+@@ -2095,13 +2095,14 @@ void Note::updateAccidental(AccidentalSt
+ 
+             AccidentalVal accVal = tpc2alter(tpc());
+             bool error = false;
+-            AccidentalVal relLineAccVal = as->accidentalVal(relLine, error);
++            int eRelLine = absStep(tpc(), epitch()+ottaveCapoFret());
++            AccidentalVal relLineAccVal = as->accidentalVal(eRelLine, error);
+             if (error) {
+                   qDebug("error accidetalVal");
+                   return;
+                   }
+-            if ((accVal != relLineAccVal) || hidden() || as->tieContext(relLine)) {
+-                  as->setAccidentalVal(relLine, accVal, _tieBack != 0 && _accidental == 0);
++            if ((accVal != relLineAccVal) || hidden() || as->tieContext(eRelLine)) {
++                  as->setAccidentalVal(eRelLine, accVal, _tieBack != 0 && _accidental == 0);
+                   acci = Accidental::value2subtype(accVal);
+                   // if previous tied note has same tpc, don't show accidental
+                   if (_tieBack && _tieBack->startNote()->tpc1() == tpc1())
+@@ -2306,6 +2307,21 @@ void Note::setHeadGroup(NoteHead::Group
+       }
+ 
+ //---------------------------------------------------------
++//   ottaveCapoFret
++//    offset added by Ottava's and Capo Fret.
++//---------------------------------------------------------
++
++int Note::ottaveCapoFret() const
++      {
++      Chord* ch = chord();
++      int capoFretId = staff()->capo(ch->segment()->tick());
++      if (capoFretId != 0)
++            capoFretId -= 1;
++
++      return staff()->pitchOffset(ch->segment()->tick()) + capoFretId;
++      }
++
++//---------------------------------------------------------
+ //   ppitch
+ //    playback pitch
+ //---------------------------------------------------------
+@@ -2323,11 +2339,8 @@ int Note::ppitch() const
+                         return div.pitch;
+                   }
+             }
+-      int capoFretId = staff()->capo(ch->segment()->tick());
+-      if (capoFretId != 0)
+-            capoFretId -= 1;
+ 
+-      return _pitch + staff()->pitchOffset(ch->segment()->tick()) + capoFretId;
++      return _pitch + ottaveCapoFret();
+       }
+ 
+ //---------------------------------------------------------
+--- a/libmscore/note.h
++++ b/libmscore/note.h
+@@ -323,6 +323,7 @@ class Note final : public Element {
+       void setPitch(int val);
+       void setPitch(int pitch, int tpc1, int tpc2);
+       int pitch() const                   { return _pitch;    }
++      int ottaveCapoFret() const;
+       int ppitch() const;           ///< playback pitch
+       int epitch() const;           ///< effective pitch
+       qreal tuning() const                { return _tuning;   }

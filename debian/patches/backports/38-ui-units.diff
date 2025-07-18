@@ -1,0 +1,25 @@
+Origin: upstream, commit:c7b37d8a26f1ae85136ff3bba9d8ae32134777dd
+Author: Maurizio M. Gavioli <mmg@vistamaresoft.com>
+Description: Fix #296345 : "Offset" suffix for text style fixed to "sp"
+ In the Edit Text Style dlg box, the suffixes of "Offset" values are
+ always "sp", but when "Follow staff size" is unchecked, the values are
+ considered "mm".
+
+--- a/mscore/editstyle.cpp
++++ b/mscore/editstyle.cpp
+@@ -1330,9 +1330,12 @@ void EditStyle::textStyleChanged(int row
+                         resetTextStyleOffset->setEnabled(cs->styleV(a.sid) != MScore::defaultStyle().value(a.sid));
+                         break;
+ 
+-                  case Pid::SIZE_SPATIUM_DEPENDENT:
+-                        textStyleSpatiumDependent->setChecked(cs->styleV(a.sid).toBool());
+-                        resetTextStyleSpatiumDependent->setEnabled(cs->styleV(a.sid) != MScore::defaultStyle().value(a.sid));
++                  case Pid::SIZE_SPATIUM_DEPENDENT: {
++                        QVariant val = cs->styleV(a.sid);
++                        textStyleSpatiumDependent->setChecked(val.toBool());
++                        resetTextStyleSpatiumDependent->setEnabled(val != MScore::defaultStyle().value(a.sid));
++                        textStyleOffset->setSuffix(val.toBool() ? tr("sp") : tr("mm"));
++                        }
+                         break;
+ 
+                   case Pid::FRAME_TYPE:

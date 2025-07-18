@@ -1,0 +1,69 @@
+Origin: upstream, commit:7c3fef8a55e434d40f08a04a03b074a3bcbb01d7
+Author: Matt McClinch <mattmcclinch@gmail.com>
+Description: fix #291146: Swing prevents midi rendering of tied notes
+
+--- a/libmscore/articulation.cpp
++++ b/libmscore/articulation.cpp
+@@ -602,6 +602,30 @@ bool Articulation::isLuteFingering() con
+       }
+ 
+ //---------------------------------------------------------
++//   isOrnament
++//---------------------------------------------------------
++
++bool Articulation::isOrnament() const
++      {
++      return _symId == SymId::ornamentTurn
++          || _symId == SymId::ornamentTurnInverted
++          || _symId == SymId::ornamentTrill
++          || _symId == SymId::brassMuteClosed
++          || _symId == SymId::ornamentMordentInverted
++          || _symId == SymId::ornamentMordent
++          || _symId == SymId::ornamentTremblement
++          || _symId == SymId::ornamentPrallMordent
++          || _symId == SymId::ornamentLinePrall
++          || _symId == SymId::ornamentUpPrall
++          || _symId == SymId::ornamentUpMordent
++          || _symId == SymId::ornamentPrecompMordentUpperPrefix
++          || _symId == SymId::ornamentDownMordent
++          || _symId == SymId::ornamentPrallUp
++          || _symId == SymId::ornamentPrallDown
++          || _symId == SymId::ornamentPrecompSlide;
++      }
++
++//---------------------------------------------------------
+ //   accessibleInfo
+ //---------------------------------------------------------
+ 
+--- a/libmscore/articulation.h
++++ b/libmscore/articulation.h
+@@ -139,6 +139,7 @@ class Articulation final : public Elemen
+       bool isAccent() const;
+       bool isMarcato() const;
+       bool isLuteFingering() const;
++      bool isOrnament() const;
+ 
+       void doAutoplace();
+       };
+--- a/libmscore/rendermidi.cpp
++++ b/libmscore/rendermidi.cpp
+@@ -2162,14 +2162,16 @@ void renderChordArticulation(Chord* chor
+ 
+ static bool shouldRenderNote(Note* n)
+       {
+-      int dist = 0;
+       while (n->tieBack()) {
+             n = n->tieBack()->startNote();
+-            ++dist;
+-            if (n && n->playEvents().offtime() > (dist * NoteEvent::NOTE_LENGTH)) {
++            if (findFirstTrill(n->chord()))
+                   // The previous tied note probably has events for this note too.
+                   // That is, we don't need to render this note separately.
+                   return false;
++            for (Articulation* a : n->chord()->articulations()) {
++                  if (a->isOrnament()) {
++                        return false;
++                        }
+                   }
+             }
+       return true;

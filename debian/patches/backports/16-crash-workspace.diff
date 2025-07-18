@@ -1,0 +1,33 @@
+Origin: upstream, commit:91b4788037003b5fe2c2b99371af5f3049041d0e
+Author: Dmitri Ovodok <dmitrio95@yandex.ru>
+Description: fix #291986: fix a crash on removing a custom workspace via menu
+ A more accurate version of 6a5a7cbcab30c94d2fcb0801670ba4ea694eb9c7
+
+--- a/mscore/workspace.cpp
++++ b/mscore/workspace.cpp
+@@ -707,8 +707,10 @@ void Workspace::read(XmlReader& e)
+                   QMenuBar* mb = mscore->menuBar();
+                   const QObjectList menus(mb->children()); // need a copy
+                   for (QObject* m : menus) {
+-                        if (qobject_cast<QMenu*>(m))
+-                              delete m;
++                        if (qobject_cast<QMenu*>(m)) {
++                              m->setParent(nullptr);
++                              m->deleteLater();
++                              }
+                         }
+                   mb->clear();
+                   menuToStringList.clear();
+@@ -811,8 +813,10 @@ void Workspace::readGlobalMenuBar()
+                               QMenuBar* mb = mscore->menuBar();
+                               const QObjectList menus(mb->children()); // need a copy
+                               for (QObject* m : menus) {
+-                                    if (qobject_cast<QMenu*>(m))
+-                                          delete m;
++                                    if (qobject_cast<QMenu*>(m)) {
++                                          m->setParent(nullptr);
++                                          m->deleteLater();
++                                          }
+                                     }
+                               mb->clear();
+                               menuToStringList.clear();
